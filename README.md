@@ -11,8 +11,10 @@ This install URL only works for normal Tampermonkey users.
 Install this loader in Tampermonkey:
 
 ```text
-https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Web-Script/main/loader/blobio-loader.user.js
+https://cdn.jsdelivr.net/gh/SkyViewBlobio/Blobgame.io-Web-Script@main/loader/blobio-loader.user.js
 ```
+
+Existing installs before `0.1.1` may need to be reinstalled once because the old loader update URL can be cached.
 
 The loader fetches:
 

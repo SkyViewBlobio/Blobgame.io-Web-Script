@@ -9,8 +9,8 @@
 // @grant        GM_xmlhttpRequest
 // @connect      cdn.jsdelivr.net
 // @connect      raw.githubusercontent.com
-// @downloadURL  https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Web-Script/main/loader/blobio-loader.user.js
-// @updateURL    https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Web-Script/main/loader/blobio-loader.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/SkyViewBlobio/Blobgame.io-Web-Script@main/loader/blobio-loader.user.js
+// @updateURL    https://cdn.jsdelivr.net/gh/SkyViewBlobio/Blobgame.io-Web-Script@main/loader/blobio-loader.user.js
 // ==/UserScript==
 
 (() => {

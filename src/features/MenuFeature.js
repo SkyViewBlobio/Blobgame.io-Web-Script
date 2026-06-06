@@ -245,11 +245,6 @@ html.${this.className} .history-wrapper {
   gap: 6px;
 }
 
-.blobio-menu-button img {
-  display: block;
-  pointer-events: none;
-}
-
 .blobio-menu-label {
   position: absolute;
   width: 1px;
@@ -528,17 +523,19 @@ html.${this.className} .history-wrapper {
     button.title = label;
     button.setAttribute('aria-label', label);
     button.dataset.panel = panelName;
-    button.classList.add('image', 'icons', 'button', 'blobio-menu-button');
-
-    const image = this.document.createElement('img');
-    image.setAttribute('alt', '');
-    image.setAttribute('src', imageUrl || '');
+    button.classList.add('icon-button', 'blobio-menu-button');
+    button.style.width = '50px';
+    button.style.height = '50px';
+    button.style.backgroundImage = imageUrl ? `url("${imageUrl}")` : '';
+    button.style.backgroundSize = 'cover';
+    button.style.backgroundRepeat = 'repeat';
+    button.style.backgroundPosition = '0% 0%';
 
     const hiddenLabel = this.document.createElement('span');
     hiddenLabel.classList.add('blobio-menu-label');
     hiddenLabel.textContent = label;
 
-    button.append(image, hiddenLabel);
+    button.appendChild(hiddenLabel);
     button.addEventListener('click', (event) => {
       event.stopPropagation?.();
       this.togglePanel(panelName);
@@ -602,8 +599,6 @@ html.${this.className} .history-wrapper {
       this.policyDock = this.createPolicyDock();
       this.document.body?.appendChild(this.policyDock);
     }
-
-    this.renderPolicyPanel();
   }
 
   createPolicyDock() {
@@ -872,9 +867,33 @@ html.${this.className} .history-wrapper {
         return false;
       }
 
+      const href = link.getAttribute('href') || '';
+      if (!href || href === '#' || href.endsWith('/#') || this.isInsideConsentManager(link)) {
+        return false;
+      }
+
       const text = `${link.textContent || ''} ${link.getAttribute('href') || ''}`;
       return /policy|privacy|terms|conditions|cookie|gdpr/i.test(text);
     });
+  }
+
+  isInsideConsentManager(node) {
+    let current = node;
+
+    while (current) {
+      const className = current.className?.toString?.() || '';
+      if (className.split(/\s+/).some((name) => name === 'fc' || name.startsWith('fc-') || name.includes('-fc-'))) {
+        return true;
+      }
+
+      if (/^fc-|cookieWarning-/i.test(className)) {
+        return true;
+      }
+
+      current = current.parentElement;
+    }
+
+    return false;
   }
 
   hideOriginalSections() {
@@ -884,16 +903,33 @@ html.${this.className} .history-wrapper {
       'cued-overlay.ytmCuedOverlayHost',
       '.ytmCuedOverlayGradient',
       '.history-wrapper',
+      '.social',
     ];
 
     for (const selector of directSelectors) {
       for (const node of this.document.querySelectorAll?.(selector) || []) {
         this.hideOriginalNode(node);
+
+        const parent = node.parentElement;
+        if (
+          node.classList?.contains('history-wrapper') &&
+          parent &&
+          parent.tagName !== 'ASIDE' &&
+          /updates?\s*notes?:/i.test(parent.textContent || '')
+        ) {
+          this.hideOriginalNode(parent);
+        }
       }
     }
 
     for (const node of this.document.querySelectorAll?.('.aside.aside-2 h1, .aside.aside-2 h2, .aside.aside-2 h3, .aside.aside-2 h4') || []) {
       if (/updates?/i.test(node.textContent || '')) {
+        this.hideOriginalNode(node);
+      }
+    }
+
+    for (const node of this.document.querySelectorAll?.('aside div, aside span, aside p') || []) {
+      if (/^\s*updates?\s*notes?:/i.test(node.textContent || '') && node.querySelector?.('.history-wrapper')) {
         this.hideOriginalNode(node);
       }
     }

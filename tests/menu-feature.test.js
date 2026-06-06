@@ -46,6 +46,7 @@ function addOriginalSocialLinks(document) {
   }
 
   document.body.appendChild(social);
+  return social;
 }
 
 function addOriginalFeaturedVideo(document) {
@@ -79,6 +80,24 @@ function addOriginalUpdateNotes(document) {
   document.body.appendChild(aside);
 }
 
+function addLiveOriginalUpdateNotes(document) {
+  const aside = document.createElement('aside');
+  aside.classList.add('aside', 'aside-1', 'hide-on-small-screen');
+
+  const wrapper = document.createElement('div');
+  wrapper.textContent = 'Updates notes:';
+
+  const history = document.createElement('div');
+  history.classList.add('history-wrapper');
+  history.textContent = 'Apr 25: Added servers list';
+
+  wrapper.appendChild(history);
+  aside.appendChild(wrapper);
+  document.body.appendChild(aside);
+
+  return wrapper;
+}
+
 function addCuedOverlay(document) {
   const overlay = document.createElement('cued-overlay');
   overlay.classList.add('ytmCuedOverlayHost');
@@ -109,10 +128,25 @@ function addOriginalPolicyLinks(document) {
   document.body.appendChild(policy);
 }
 
+function addConsentManagerPolicyLinks(document) {
+  const consent = document.createElement('div');
+  consent.classList.add('fc-consent-root');
+
+  for (let index = 0; index < 4; index += 1) {
+    const link = document.createElement('a');
+    link.classList.add('fc-vendor-policy-link');
+    link.setAttribute('href', '#');
+    link.textContent = 'Privacy policy';
+    consent.appendChild(link);
+  }
+
+  document.body.appendChild(consent);
+}
+
 test('MenuFeature injects toolbar buttons next to the Replay button and hides original socials', () => {
   const document = createFakeDocument();
   const { controls, replayButton } = addReplayButton(document);
-  addOriginalSocialLinks(document);
+  const originalSocial = addOriginalSocialLinks(document);
 
   const feature = new MenuFeature({ document, assets });
 
@@ -128,19 +162,24 @@ test('MenuFeature injects toolbar buttons next to the Replay button and hides or
   assert.equal(controls.children.indexOf(toolbar), controls.children.indexOf(replayButton) + 1);
   const buttons = toolbar.querySelector('.blobio-menu-buttons').querySelectorAll('button');
   assert.equal(buttons.length, 3);
-  assert.equal(buttons[0].classList.contains('button'), true);
-  assert.equal(buttons[0].classList.contains('image'), true);
-  assert.equal(buttons[0].classList.contains('icons'), true);
+  assert.equal(buttons[0].classList.contains('icon-button'), true);
+  assert.equal(buttons[0].style.width, '50px');
+  assert.equal(buttons[0].style.height, '50px');
+  assert.equal(buttons[0].style.backgroundSize, 'cover');
+  assert.equal(buttons[0].style.backgroundRepeat, 'repeat');
+  assert.equal(buttons[0].style.backgroundPosition, '0% 0%');
   assert.match(toolbar.textContent, /Featured/);
   assert.match(toolbar.textContent, /Updates/);
   assert.match(toolbar.textContent, /Socials/);
   assert.doesNotMatch(style.textContent, /radial-gradient/);
   assert.doesNotMatch(style.textContent, /\.blobio-menu-button:hover/);
+  assert.equal(originalSocial.classList.contains('blobio-original-hidden'), true);
 
   feature.destroy();
 
   assert.equal(document.getElementById('blobio-menu-style'), null);
   assert.equal(document.querySelector('.blobio-menu-toolbar'), null);
+  assert.equal(originalSocial.classList.contains('blobio-original-hidden'), false);
 });
 
 test('MenuFeature hides original featured video, update history, and cued overlay blocks', () => {
@@ -163,6 +202,20 @@ test('MenuFeature hides original featured video, update history, and cued overla
   feature.destroy();
 
   assert.equal(document.getElementById('youtube-title').classList.contains('blobio-original-hidden'), false);
+});
+
+test('MenuFeature hides the live Updates notes wrapper from aside-1', () => {
+  const document = createFakeDocument();
+  addReplayButton(document);
+  const updateWrapper = addLiveOriginalUpdateNotes(document);
+
+  const feature = new MenuFeature({ document, assets });
+  feature.start();
+
+  assert.equal(updateWrapper.classList.contains('blobio-original-hidden'), true);
+  assert.equal(document.querySelector('.history-wrapper').classList.contains('blobio-original-hidden'), true);
+
+  feature.destroy();
 });
 
 test('MenuFeature opens one animated panel and closes it on Escape or outside click', () => {
@@ -278,6 +331,7 @@ test('MenuFeature folds original policy links into a bottom policy menu', () => 
   assert.equal(originalLinks[0].classList.contains('blobio-original-hidden'), true);
   assert.notEqual(policyDock, null);
   assert.equal(policyPanel.classList.contains('is-open'), false);
+  assert.equal(policyPanel.querySelectorAll('a[href]').length, 0);
 
   policyDock.querySelector('button').click();
 
@@ -295,4 +349,24 @@ test('MenuFeature folds original policy links into a bottom policy menu', () => 
 
   assert.equal(document.querySelector('.blobio-policy-dock'), null);
   assert.equal(originalLinks[0].classList.contains('blobio-original-hidden'), false);
+});
+
+test('MenuFeature ignores consent-manager vendor policy links', () => {
+  const document = createFakeDocument();
+  addReplayButton(document);
+  addOriginalPolicyLinks(document);
+  addConsentManagerPolicyLinks(document);
+
+  const feature = new MenuFeature({ document, assets });
+  feature.start();
+
+  const policyDock = document.querySelector('.blobio-policy-dock');
+  policyDock.querySelector('button').click();
+
+  const foldedLinks = document.getElementById('blobio-panel-policy').querySelectorAll('a[href]');
+  assert.equal(foldedLinks.length, 2);
+  assert.equal(foldedLinks[0].getAttribute('href'), 'https://blob-devour.blogspot.com/2017/08/privacy-policy-this-policy-will-explain.html');
+  assert.equal(foldedLinks[1].getAttribute('href'), 'https://blob-terms-and-conditions.blogspot.com/2018/12/blob-io-terms-and-conditions.html');
+
+  feature.destroy();
 });

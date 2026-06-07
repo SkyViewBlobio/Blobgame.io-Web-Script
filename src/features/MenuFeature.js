@@ -6,6 +6,7 @@ const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
+const OTHER_GAME_NAMES = ['Viper', 'Hexa'];
 
 const DEFAULT_VIDEO = {
   title: 'Featured Blob.io Video',
@@ -551,11 +552,19 @@ export class MenuFeature {
     const links = this.document.createElement('div');
     links.classList.add('blobio-game-links');
 
-    for (const original of this.getOtherProjectLinks()) {
+    for (const [index, original] of this.getOtherProjectLinks().entries()) {
+      const labelText = OTHER_GAME_NAMES[index] || original.getAttribute('aria-label') || original.getAttribute('title') || 'Other game';
       const href = original.getAttribute('href');
+      const card = this.document.createElement('div');
+      card.classList.add('blobio-game-card');
+
+      const label = this.document.createElement('div');
+      label.classList.add('blobio-game-label');
+      label.textContent = labelText;
+
       const gameLink = this.document.createElement(href ? 'a' : 'button');
       gameLink.classList.add('blobio-game-link');
-      gameLink.setAttribute('aria-label', original.getAttribute('aria-label') || original.getAttribute('title') || 'Other game');
+      gameLink.setAttribute('aria-label', labelText);
       gameLink.style.backgroundImage = original.style?.backgroundImage || this.extractBackgroundImage(original.getAttribute('style') || '');
 
       if (href) {
@@ -570,7 +579,8 @@ export class MenuFeature {
         });
       }
 
-      links.appendChild(gameLink);
+      card.append(label, gameLink);
+      links.appendChild(card);
     }
 
     body.appendChild(links);
@@ -821,7 +831,6 @@ export class MenuFeature {
       '.ytmCuedOverlayGradient',
       '.history-wrapper',
       '.social',
-      'footer.footer',
     ];
 
     for (const selector of directSelectors) {
@@ -879,12 +888,30 @@ export class MenuFeature {
       return;
     }
 
+    if (this.isInsideOriginalFooter(node)) {
+      return;
+    }
+
     node.classList?.add(HIDDEN_CLASS);
     this.hiddenOriginalNodes.add(node);
   }
 
   isInsideOwnUi(node) {
     return Boolean(node && (this.toolbar?.contains(node) || this.policyDock?.contains(node)));
+  }
+
+  isInsideOriginalFooter(node) {
+    let current = node;
+
+    while (current) {
+      if (current.tagName === 'FOOTER' && current.classList?.contains('footer')) {
+        return true;
+      }
+
+      current = current.parentElement;
+    }
+
+    return false;
   }
 
   getPanels() {

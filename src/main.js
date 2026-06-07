@@ -24,8 +24,12 @@ class BlobioExtension {
     }
 
     const document = this.window.document;
-    if (!document?.documentElement) {
+    if (!document) {
       this.window.console?.warn('[Blobio] Extension could not start: document is not ready.');
+      return false;
+    }
+
+    if (!document.documentElement) {
       return false;
     }
 
@@ -75,7 +79,18 @@ export function startBlobioExtension(windowRef = globalThis) {
 
   const extension = new BlobioExtension(windowRef);
   windowRef[INSTANCE_KEY] = extension;
-  extension.start();
+
+  if (!extension.start()) {
+    const tryStart = () => {
+      if (!extension.started) {
+        extension.start();
+      }
+    };
+
+    windowRef.document?.addEventListener?.('DOMContentLoaded', tryStart, { once: true });
+    windowRef.setTimeout?.(tryStart, 0);
+  }
+
   return extension;
 }
 

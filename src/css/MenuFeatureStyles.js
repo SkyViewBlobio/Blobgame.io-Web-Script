@@ -9,7 +9,9 @@ html.${className} .${hiddenClass} {
 }
 
 html.${className} footer.footer {
-  display: none !important;
+  display: flex !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 html.${className} .aside.aside-2 {
@@ -76,7 +78,7 @@ html.${className} #game-wrapper .custom-select-option {
 
 html.${className} .progress-bar {
   border: 1px solid rgba(142, 255, 174, 0.38) !important;
-  background: rgba(3, 44, 23, 0.46) !important;
+  background-color: rgba(3, 44, 23, 0.46) !important;
   box-shadow: 0 0 14px rgba(79, 255, 130, 0.24), inset 0 0 10px rgba(79, 255, 130, 0.12) !important;
 }
 
@@ -120,6 +122,18 @@ html.${className} #custom-host-input {
   text-align: center !important;
   text-shadow: 0 0 6px rgba(118, 255, 154, 0.72) !important;
   box-shadow: inset 0 0 8px rgba(79, 255, 130, 0.18) !important;
+}
+
+html.${className} .fleft.username {
+  color: #dfffe6 !important;
+  background-image: linear-gradient(110deg, #dfffe6 0%, #dfffe6 38%, #ffffff 50%, #dfffe6 62%, #dfffe6 100%) !important;
+  background-size: 250% 100% !important;
+  background-position: 120% 0 !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72) !important;
+  animation: blobio-username-shine 5600ms ease-in-out infinite;
 }
 
 .${toolbarClass} {
@@ -205,10 +219,19 @@ html.${className} #custom-host-input {
 .blobio-panel-close {
   width: 24px;
   height: 24px;
-  border: 1px solid rgba(135, 255, 168, 0.46);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 116, 116, 0.72);
   border-radius: 6px;
-  background: rgba(5, 38, 22, 0.86);
-  color: #dcffe4;
+  background: rgba(102, 10, 16, 0.92);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(60, 0, 0, 0.95), 0 0 10px rgba(255, 42, 42, 0.55);
+  box-shadow: 0 0 12px rgba(255, 49, 49, 0.26), inset 0 0 8px rgba(255, 89, 89, 0.18);
   cursor: pointer;
 }
 
@@ -305,6 +328,8 @@ html.${className} #custom-host-input {
   bottom: 170px;
   transform: translateX(-50%);
   z-index: 2147482500;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
 .blobio-dock-buttons {
@@ -350,15 +375,27 @@ html.${className} #custom-host-input {
 }
 
 .blobio-policy-links {
-  display: grid;
-  gap: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
 .blobio-policy-link {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(142, 255, 174, 0.46);
+  border-radius: 8px;
+  background: rgba(3, 44, 23, 0.42);
   color: #eaffee;
   text-decoration: none;
   font-size: 12px;
   line-height: 1.2;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.52);
+  box-shadow: inset 0 0 8px rgba(91, 255, 132, 0.14);
 }
 
 .blobio-policy-link:hover {
@@ -368,7 +405,21 @@ html.${className} #custom-host-input {
 .blobio-game-links {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 24px;
+}
+
+.blobio-game-card {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.blobio-game-label {
+  color: #dfffe6;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 14px rgba(79, 255, 130, 0.32);
 }
 
 .blobio-game-link {
@@ -397,6 +448,18 @@ html.${className} #custom-host-input {
   to {
     transform: scale(1.03);
     text-shadow: 0 0 12px rgba(172, 255, 187, 0.94), 0 0 26px rgba(95, 255, 132, 0.48);
+  }
+}
+
+@keyframes blobio-username-shine {
+  0%,
+  62% {
+    background-position: 120% 0;
+  }
+
+  82%,
+  100% {
+    background-position: -120% 0;
   }
 }
 `.trim();

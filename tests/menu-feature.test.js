@@ -431,6 +431,8 @@ test('MenuFeature folds original policy links into a bottom policy menu', () => 
   assert.match(style.textContent, /\.blobio-dock-button\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.46\)/);
   assert.match(style.textContent, /\.blobio-dock-button\s*{[\s\S]*border: 1px solid rgba\(142, 255, 174, 0\.68\)/);
   assert.match(style.textContent, /\.blobio-footer-dock \.blobio-menu-panel\s*{[\s\S]*top: calc\(100% \+ 8px\);/);
+  assert.match(style.textContent, /\.blobio-policy-links\s*{[\s\S]*display: flex;/);
+  assert.match(style.textContent, /\.blobio-policy-link\s*{[\s\S]*border: 1px solid rgba\(142, 255, 174, 0\.46\)/);
   assert.doesNotMatch(style.textContent, /\.blobio-policy-dock \.blobio-menu-panel\s*{[\s\S]*bottom: calc\(100%/);
 
   policyDock.querySelector('button').click();
@@ -491,18 +493,24 @@ test('MenuFeature folds other project icons into a transparent games dropdown', 
   const gamesButton = dock.querySelectorAll('button').find((button) => button.dataset.panel === 'games');
   const gamesPanel = document.getElementById('blobio-panel-games');
 
-  assert.equal(footer.classList.contains('blobio-original-hidden'), true);
-  assert.equal(partner.classList.contains('blobio-original-hidden'), true);
+  assert.equal(footer.classList.contains('blobio-original-hidden'), false);
+  assert.equal(partner.classList.contains('blobio-original-hidden'), false);
   assert.notEqual(gamesButton, undefined);
   assert.match(gamesButton.className, /blobio-dock-button/);
   assert.match(style.textContent, /\.blobio-game-links/);
+  assert.match(style.textContent, /\.blobio-game-links\s*{[\s\S]*gap: 24px;/);
+  assert.match(style.textContent, /\.blobio-game-label\s*{[\s\S]*color: #dfffe6;/);
   assert.equal(gamesPanel.classList.contains('is-open'), false);
 
   gamesButton.click();
 
-  const gameButtons = gamesPanel.querySelectorAll('.blobio-game-links button');
+  const gameCards = gamesPanel.querySelectorAll('.blobio-game-card');
+  const gameButtons = gamesPanel.querySelectorAll('.blobio-game-card button');
   assert.equal(gamesPanel.classList.contains('is-open'), true);
+  assert.equal(gameCards.length, 2);
   assert.equal(gameButtons.length, 2);
+  assert.match(gameCards[0].textContent, /Viper/);
+  assert.match(gameCards[1].textContent, /Hexa/);
   assert.equal(gameButtons[0].style.backgroundImage, 'url("game-one.png")');
 
   gameButtons[0].click();
@@ -533,8 +541,17 @@ test('MenuFeature CSS hides the inputs image and frames main menu fields with gr
   assert.match(style, /\.inputs-container input\s*,[\s\S]*\.inputs-container button\s*,[\s\S]*#game-wrapper \.custom-select-display\s*,[\s\S]*#game-wrapper \.custom-select-option\s*,[\s\S]*\.progress-bar\s*,[\s\S]*\.progress-bar-title\s*{[\s\S]*color: #dfffe6 !important;/);
   assert.match(style, /#game-wrapper \.custom-select-display\s*{[\s\S]*background: rgba\(3, 28, 17, 0\.46\) !important;/);
   assert.match(style, /#game-wrapper \.custom-select-option\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.78\) !important;/);
-  assert.match(style, /\.progress-bar\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.46\) !important;/);
-  assert.match(style, /footer\.footer\s*{[\s\S]*display: none !important;/);
+  assert.match(style, /\.progress-bar\s*{[\s\S]*background-color: rgba\(3, 44, 23, 0\.46\) !important;/);
+  const progressBarCss = style.match(/\.progress-bar\s*{[^}]*}/)?.[0] || '';
+  assert.doesNotMatch(progressBarCss, /background: rgba\(3, 44, 23, 0\.46\) !important;/);
+  assert.match(style, /footer\.footer\s*{[\s\S]*visibility: hidden !important;/);
+  const footerCss = style.match(/footer\.footer\s*{[^}]*}/)?.[0] || '';
+  assert.doesNotMatch(footerCss, /display: none !important;/);
+  assert.match(style, /\.blobio-panel-close\s*{[\s\S]*display: inline-flex;/);
+  assert.match(style, /\.blobio-panel-close\s*{[\s\S]*background: rgba\(102, 10, 16, 0\.92\);/);
+  assert.match(style, /\.blobio-panel-close\s*{[\s\S]*color: #fff;/);
+  assert.match(style, /\.fleft\.username\s*{[\s\S]*animation: blobio-username-shine/);
+  assert.match(style, /@keyframes blobio-username-shine/);
 
   feature.destroy();
 });

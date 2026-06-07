@@ -14,6 +14,22 @@ const assets = {
   instagramIcon: 'data:image/png;base64,instagram-icon',
 };
 
+function createMemoryStorage(initialValues = {}) {
+  const values = new Map(Object.entries(initialValues));
+
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+  };
+}
+
 function addReplayButton(document) {
   const header = document.createElement('div');
   header.classList.add('header');
@@ -33,6 +49,57 @@ function addReplayButton(document) {
   document.body.appendChild(header);
 
   return { controls, replayButton };
+}
+
+function addNameInput(document) {
+  const inputs = document.createElement('div');
+  inputs.classList.add('inputs-container');
+
+  const input = document.createElement('input');
+  input.id = 'nick';
+  input.setAttribute('type', 'text');
+
+  inputs.appendChild(input);
+  document.body.appendChild(inputs);
+  return input;
+}
+
+function addSettingsModal(document) {
+  const settings = document.createElement('app-settings');
+
+  const left = document.createElement('div');
+  left.classList.add('left');
+  const tabs = document.createElement('ul');
+
+  for (const label of ['Options', 'Keybindings', 'Theme']) {
+    const tab = document.createElement('li');
+    tab.textContent = label;
+    if (label === 'Keybindings') {
+      tab.classList.add('active');
+    }
+    tabs.appendChild(tab);
+  }
+
+  const right = document.createElement('div');
+  right.classList.add('right');
+  const inner = document.createElement('div');
+  inner.classList.add('inner-container');
+  const content = document.createElement('div');
+  content.classList.add('content-container', 'scroll');
+  const grid = document.createElement('div');
+  grid.classList.add('grid-container');
+  const title = document.createElement('div');
+  title.classList.add('title');
+  title.textContent = 'Select entry and press any key to bind';
+
+  grid.appendChild(title);
+  content.appendChild(grid);
+  inner.appendChild(content);
+  right.appendChild(inner);
+  left.appendChild(tabs);
+  settings.append(left, right);
+  document.body.appendChild(settings);
+  return settings;
 }
 
 function addUsername(document, text = 'SkyView') {
@@ -425,27 +492,32 @@ test('MenuFeature folds original policy links into a bottom policy menu', () => 
   const style = document.getElementById('blobio-menu-style');
   const originalLinks = document.querySelectorAll('.policy a[href]');
   const policyDock = document.querySelector('.blobio-policy-dock');
+  const modalHost = document.querySelector('.blobio-footer-modal-host');
   const policyPanel = document.getElementById('blobio-panel-policy');
 
   assert.equal(originalLinks.length, 2);
   assert.equal(originalLinks[0].classList.contains('blobio-original-hidden'), true);
   assert.equal(partnerLinks.classList.contains('blobio-original-hidden'), true);
   assert.notEqual(policyDock, null);
+  assert.notEqual(modalHost, null);
+  assert.equal(policyPanel.parentNode, modalHost);
   assert.equal(policyPanel.classList.contains('is-open'), false);
   assert.equal(policyPanel.querySelectorAll('a[href]').length, 0);
+  const footerDockCss = style.textContent.match(/\.blobio-footer-dock\s*{[^}]*}/)?.[0] || '';
   assert.match(style.textContent, /\.blobio-footer-dock\s*{[\s\S]*left: 50%;/);
-  assert.match(style.textContent, /\.blobio-footer-dock\s*{[\s\S]*bottom: 170px;/);
+  assert.match(style.textContent, /\.blobio-footer-dock\s*{[\s\S]*bottom: 10px;/);
   assert.match(style.textContent, /\.blobio-footer-dock\s*{[\s\S]*transform: translateX\(-50%\);/);
   assert.match(style.textContent, /\.blobio-footer-dock\s*{[\s\S]*z-index: 20;/);
-  assert.doesNotMatch(style.textContent, /\.blobio-footer-dock\s*{[\s\S]*z-index: 2147482500;/);
-  assert.match(style.textContent, /\.blobio-dock-buttons\s*{[\s\S]*position: relative;/);
-  assert.match(style.textContent, /\.blobio-policy-button\s*{[\s\S]*transform: translateX\(calc\(-100% - 4px\)\);/);
-  assert.match(style.textContent, /\.blobio-games-button\s*{[\s\S]*transform: translateX\(4px\);/);
-  assert.match(style.textContent, /\.blobio-footer-dock\.is-focusing-policy \.blobio-policy-button\s*{[\s\S]*transform: translateX\(-50%\);/);
-  assert.match(style.textContent, /\.blobio-footer-dock\.is-focusing-games \.blobio-games-button\s*{[\s\S]*transform: translateX\(-50%\);/);
+  assert.doesNotMatch(footerDockCss, /z-index: 2147482500;/);
+  assert.match(style.textContent, /\.blobio-dock-buttons\s*{[\s\S]*display: flex;/);
+  assert.doesNotMatch(style.textContent, /\.blobio-footer-dock\.is-focusing/);
+  assert.doesNotMatch(style.textContent, /\.blobio-policy-button\s*{[\s\S]*transform:/);
+  assert.match(style.textContent, /\.blobio-footer-modal-host\s*{[\s\S]*z-index: 2147482500;/);
   assert.match(style.textContent, /\.blobio-dock-button\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.46\)/);
   assert.match(style.textContent, /\.blobio-dock-button\s*{[\s\S]*border: 1px solid rgba\(142, 255, 174, 0\.68\)/);
-  assert.match(style.textContent, /\.blobio-footer-dock \.blobio-menu-panel\s*{[\s\S]*top: calc\(100% \+ 8px\);/);
+  assert.match(style.textContent, /\.blobio-footer-modal-host \.blobio-menu-panel\s*{[\s\S]*top: 50%;/);
+  assert.match(style.textContent, /\.blobio-footer-modal-host \.blobio-menu-panel\s*{[\s\S]*left: 50%;/);
+  assert.match(style.textContent, /\.blobio-footer-modal-host \.blobio-menu-panel\s*{[\s\S]*transform: translate\(-50%, -48%\) scale\(0\.96\);/);
   assert.match(style.textContent, /\.blobio-policy-links\s*{[\s\S]*display: flex;/);
   assert.match(style.textContent, /\.blobio-policy-link\s*{[\s\S]*border: 1px solid rgba\(142, 255, 174, 0\.46\)/);
   assert.doesNotMatch(style.textContent, /\.blobio-policy-dock \.blobio-menu-panel\s*{[\s\S]*bottom: calc\(100%/);
@@ -454,7 +526,7 @@ test('MenuFeature folds original policy links into a bottom policy menu', () => 
 
   const foldedLinks = policyPanel.querySelectorAll('a[href]');
   assert.equal(policyPanel.classList.contains('is-open'), true);
-  assert.equal(policyDock.classList.contains('is-focusing-policy'), true);
+  assert.equal(policyDock.classList.contains('is-focusing-policy'), false);
   assert.equal(policyDock.classList.contains('is-focusing-games'), false);
   assert.equal(foldedLinks.length, 7);
   assert.doesNotMatch(policyPanel.textContent, /^Policy/);
@@ -472,6 +544,7 @@ test('MenuFeature folds original policy links into a bottom policy menu', () => 
   feature.destroy();
 
   assert.equal(document.querySelector('.blobio-policy-dock'), null);
+  assert.equal(document.querySelector('.blobio-footer-modal-host'), null);
   assert.equal(originalLinks[0].classList.contains('blobio-original-hidden'), false);
   assert.equal(partnerLinks.classList.contains('blobio-original-hidden'), false);
 });
@@ -508,11 +581,13 @@ test('MenuFeature folds other project icons into a transparent games dropdown', 
 
   const style = document.getElementById('blobio-menu-style');
   const dock = document.querySelector('.blobio-footer-dock');
+  const modalHost = document.querySelector('.blobio-footer-modal-host');
   const gamesButton = dock.querySelectorAll('button').find((button) => button.dataset.panel === 'games');
   const gamesPanel = document.getElementById('blobio-panel-games');
 
   assert.equal(footer.classList.contains('blobio-original-hidden'), false);
   assert.equal(partner.classList.contains('blobio-original-hidden'), false);
+  assert.equal(gamesPanel.parentNode, modalHost);
   assert.notEqual(gamesButton, undefined);
   assert.match(gamesButton.className, /blobio-dock-button/);
   assert.match(style.textContent, /\.blobio-game-links/);
@@ -525,7 +600,7 @@ test('MenuFeature folds other project icons into a transparent games dropdown', 
   const gameCards = gamesPanel.querySelectorAll('.blobio-game-card');
   const gameButtons = gamesPanel.querySelectorAll('.blobio-game-card button');
   assert.equal(gamesPanel.classList.contains('is-open'), true);
-  assert.equal(dock.classList.contains('is-focusing-games'), true);
+  assert.equal(dock.classList.contains('is-focusing-games'), false);
   assert.equal(dock.classList.contains('is-focusing-policy'), false);
   assert.equal(gameCards.length, 2);
   assert.equal(gameButtons.length, 2);
@@ -628,6 +703,82 @@ test('MenuFeature splits logged-in username into staggered animated letters', ()
   assert.equal(username.dataset.blobioUsernameText, 'Guest');
   assert.equal(letters.length, 5);
   assert.deepEqual(letters.map((letter) => letter.textContent), ['G', 'u', 'e', 's', 't']);
+
+  feature.destroy();
+});
+
+test('MenuFeature adds an Extension settings category with a WaterMark toggle', () => {
+  const document = createFakeDocument();
+  addReplayButton(document);
+  const settings = addSettingsModal(document);
+  const nameInput = addNameInput(document);
+  const storage = createMemoryStorage({ 'blobio.watermark.enabled': '1' });
+
+  const feature = new MenuFeature({ document, assets, storage, version: '0.1.15' });
+  feature.start();
+
+  const style = document.getElementById('blobio-menu-style').textContent;
+  const tab = settings.querySelector('.blobio-extension-settings-tab');
+  const panel = settings.querySelector('.blobio-extension-settings-panel');
+  const checkbox = document.getElementById('config-switch-watermark');
+  const watermark = document.querySelector('.blobio-watermark');
+
+  assert.notEqual(tab, null);
+  assert.equal(tab.textContent, 'Extension');
+  assert.notEqual(panel, null);
+  assert.notEqual(checkbox, null);
+  assert.equal(checkbox.checked, true);
+  assert.equal(panel.classList.contains('blobio-extension-settings-panel'), true);
+  assert.equal(watermark.textContent, 'Blob-Extension v0.1.15');
+  assert.equal(watermark.parentNode.children.indexOf(watermark), watermark.parentNode.children.indexOf(nameInput) - 1);
+  assert.match(style, /\.blobio-extension-settings-tab\s*{[\s\S]*color: #dfffe6;/);
+  assert.match(style, /\.blobio-watermark-prefix\s*{[\s\S]*text-shadow:/);
+  assert.match(style, /\.blobio-watermark-extension\s*{[\s\S]*linear-gradient\(90deg, #dfffe6, #ffffff, #64ff8b\)/);
+  assert.match(style, /\.blobio-watermark-extension::after\s*{[\s\S]*animation: blobio-watermark-underline 5000ms ease-in-out infinite;/);
+
+  tab.click();
+
+  assert.equal(settings.classList.contains('blobio-extension-settings-active'), true);
+  assert.equal(tab.classList.contains('active'), true);
+  assert.match(panel.textContent, /WaterMark/);
+
+  settings.querySelector('.left li').click();
+
+  assert.equal(settings.classList.contains('blobio-extension-settings-active'), false);
+  assert.equal(tab.classList.contains('active'), false);
+
+  feature.destroy();
+
+  assert.equal(document.querySelector('.blobio-extension-settings-tab'), null);
+  assert.equal(document.querySelector('.blobio-extension-settings-panel'), null);
+  assert.equal(document.querySelector('.blobio-watermark'), null);
+});
+
+test('MenuFeature persists the WaterMark toggle and removes the badge when disabled', () => {
+  const document = createFakeDocument();
+  addReplayButton(document);
+  addSettingsModal(document);
+  addNameInput(document);
+  const storage = createMemoryStorage();
+
+  const feature = new MenuFeature({ document, assets, storage, version: '0.1.15' });
+  feature.start();
+
+  const checkbox = document.getElementById('config-switch-watermark');
+  assert.equal(checkbox.checked, false);
+  assert.equal(document.querySelector('.blobio-watermark'), null);
+
+  checkbox.checked = true;
+  checkbox.dispatchEvent({ type: 'change', target: checkbox });
+
+  assert.equal(storage.getItem('blobio.watermark.enabled'), '1');
+  assert.equal(document.querySelector('.blobio-watermark').textContent, 'Blob-Extension v0.1.15');
+
+  checkbox.checked = false;
+  checkbox.dispatchEvent({ type: 'change', target: checkbox });
+
+  assert.equal(storage.getItem('blobio.watermark.enabled'), '0');
+  assert.equal(document.querySelector('.blobio-watermark'), null);
 
   feature.destroy();
 });

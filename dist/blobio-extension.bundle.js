@@ -504,7 +504,7 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
 .blobio-footer-dock {
   position: fixed;
   left: 50%;
-  bottom: 170px;
+  bottom: 10px;
   transform: translateX(-50%);
   z-index: 20;
   visibility: visible !important;
@@ -512,16 +512,12 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
 }
 
 .blobio-dock-buttons {
-  position: relative;
-  width: 230px;
-  height: 30px;
-  display: block;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
 .blobio-dock-button {
-  position: absolute;
-  top: 0;
-  left: 50%;
   padding: 5px 11px;
   border: 1px solid rgba(142, 255, 174, 0.68);
   border-radius: 8px;
@@ -533,31 +529,7 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   text-shadow: 0 0 6px rgba(118, 255, 154, 0.7);
   box-shadow: 0 0 12px rgba(79, 255, 130, 0.22), inset 0 0 8px rgba(79, 255, 130, 0.13);
   cursor: pointer;
-  transition: transform 180ms ease, background 150ms ease, box-shadow 150ms ease;
-}
-
-.blobio-policy-button {
-  transform: translateX(calc(-100% - 4px));
-}
-
-.blobio-games-button {
-  transform: translateX(4px);
-}
-
-.blobio-footer-dock.is-focusing-policy .blobio-policy-button {
-  transform: translateX(-50%);
-}
-
-.blobio-footer-dock.is-focusing-games .blobio-games-button {
-  transform: translateX(-50%);
-}
-
-.blobio-footer-dock.is-focusing-policy .blobio-games-button {
-  transform: translateX(calc(-100% - 36px));
-}
-
-.blobio-footer-dock.is-focusing-games .blobio-policy-button {
-  transform: translateX(56px);
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
 
 .blobio-dock-button:hover,
@@ -566,20 +538,31 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   box-shadow: 0 0 16px rgba(99, 255, 142, 0.34), inset 0 0 10px rgba(99, 255, 142, 0.18);
 }
 
-.blobio-footer-dock .blobio-menu-panel {
-  top: calc(100% + 8px);
+.blobio-footer-modal-host {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482500;
+  visibility: visible !important;
+  pointer-events: none;
+}
+
+.blobio-footer-modal-host .blobio-menu-panel {
+  position: fixed;
+  top: 50%;
   right: auto;
   bottom: auto;
   left: 50%;
-  width: min(360px, calc(100vw - 28px));
-  max-height: 150px;
-  overflow: auto;
-  transform: translateX(-50%) translateY(-8px) scaleY(0.96);
-  transform-origin: top center;
+  width: min(430px, calc(100vw - 32px));
+  max-height: 0;
+  overflow: hidden;
+  transform: translate(-50%, -48%) scale(0.96);
+  transform-origin: center;
 }
 
-.blobio-footer-dock .blobio-menu-panel.is-open {
-  transform: translateX(-50%) translateY(0) scaleY(1);
+.blobio-footer-modal-host .blobio-menu-panel.is-open {
+  max-height: min(520px, calc(100vh - 72px));
+  overflow: auto;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .blobio-policy-links {
@@ -647,6 +630,84 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   box-shadow: 0 0 16px rgba(92, 255, 132, 0.38), inset 0 0 8px rgba(91, 255, 132, 0.18);
 }
 
+html.${className} app-settings .blobio-extension-settings-tab {
+  color: #dfffe6;
+  font-weight: 800;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 16px rgba(79, 255, 130, 0.28);
+}
+
+html.${className} app-settings .blobio-extension-settings-tab.active {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(190, 255, 204, 0.94), 0 0 22px rgba(99, 255, 142, 0.48);
+}
+
+html.${className} app-settings .blobio-extension-settings-panel {
+  display: none;
+}
+
+html.${className} app-settings.blobio-extension-settings-active .content-container > :not(.blobio-extension-settings-panel) {
+  display: none !important;
+}
+
+html.${className} app-settings.blobio-extension-settings-active .blobio-extension-settings-panel {
+  display: grid;
+}
+
+html.${className} app-settings .blobio-extension-setting-row {
+  color: #dfffe6;
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.62);
+}
+
+html.${className} app-settings .blobio-extension-setting-row label[for="config-switch-watermark"] {
+  color: #dfffe6;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.62);
+}
+
+html.${className} .blobio-watermark {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+html.${className} .blobio-watermark-prefix {
+  color: #dfffe6;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 18px rgba(79, 255, 130, 0.28);
+}
+
+html.${className} .blobio-watermark-version {
+  color: #dfffe6;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 18px rgba(79, 255, 130, 0.28);
+}
+
+html.${className} .blobio-watermark-extension {
+  position: relative;
+  display: inline-block;
+  color: transparent;
+  background: linear-gradient(90deg, #dfffe6, #ffffff, #64ff8b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 8px rgba(118, 255, 154, 0.34);
+}
+
+html.${className} .blobio-watermark-extension::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(196, 255, 209, 0), rgba(255, 255, 255, 0.95), rgba(99, 255, 139, 0.86), rgba(196, 255, 209, 0));
+  transform-origin: left center;
+  animation: blobio-watermark-underline 5000ms ease-in-out infinite;
+}
+
 @keyframes blobio-social-glow {
   from {
     transform: scale(1);
@@ -656,6 +717,32 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   to {
     transform: scale(1.03);
     text-shadow: 0 0 12px rgba(172, 255, 187, 0.94), 0 0 26px rgba(95, 255, 132, 0.48);
+  }
+}
+
+@keyframes blobio-watermark-underline {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  }
+
+  12% {
+    opacity: 1;
+    transform: scaleX(1);
+    filter: drop-shadow(0 0 7px rgba(180, 255, 199, 0.95));
+  }
+
+  28% {
+    opacity: 0;
+    transform: scaleX(1);
+    filter: drop-shadow(0 0 1px rgba(99, 255, 139, 0.2));
+  }
+
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+    filter: drop-shadow(0 0 1px rgba(99, 255, 139, 0.2));
   }
 }
 
@@ -695,10 +782,12 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   var DEFAULT_CLASS_NAME2 = "blobio-menu-enabled";
   var DEFAULT_STYLE_ID2 = "blobio-menu-style";
   var DEFAULT_TOOLBAR_CLASS = "blobio-menu-toolbar";
+  var DEFAULT_EXTENSION_VERSION = "0.1.15";
   var HIDDEN_CLASS = "blobio-original-hidden";
   var PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
   var FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
   var OTHER_GAME_NAMES = ["Viper", "Hexa"];
+  var WATERMARK_STORAGE_KEY = "blobio.watermark.enabled";
   var DEFAULT_VIDEO = {
     title: "Featured Blob.io Video",
     url: "https://www.youtube.com/watch?v=GOlXDLWeGMo"
@@ -767,27 +856,40 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       assetKey: "instagramIcon"
     }
   ];
+  function getDefaultStorage(document) {
+    try {
+      return document?.defaultView?.localStorage || globalThis.localStorage || null;
+    } catch {
+      return null;
+    }
+  }
   var MenuFeature = class {
     constructor({
       document = globalThis.document,
       assets = {},
       logger = console,
       className = DEFAULT_CLASS_NAME2,
-      styleId = DEFAULT_STYLE_ID2
+      styleId = DEFAULT_STYLE_ID2,
+      storage = getDefaultStorage(document),
+      version = DEFAULT_EXTENSION_VERSION
     } = {}) {
       this.document = document;
       this.assets = assets;
       this.logger = logger;
       this.className = className;
       this.styleId = styleId;
+      this.storage = storage;
+      this.version = version;
       this.started = false;
       this.styleNode = null;
       this.toolbar = null;
+      this.footerModalHost = null;
       this.observer = null;
       this.refreshTimer = null;
       this.panelBodies = /* @__PURE__ */ new Map();
       this.hiddenOriginalNodes = /* @__PURE__ */ new Set();
       this.policyDock = null;
+      this.settingsListeners = [];
       this.documentClickHandler = null;
       this.keydownHandler = null;
     }
@@ -804,10 +906,12 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       this.installToolbar();
       this.hideOriginalSections();
       this.installPolicyDock();
+      this.installExtensionSettings();
+      this.syncWatermark();
       this.syncUsernameAnimation();
       this.watchPage();
       this.documentClickHandler = (event) => {
-        if (this.toolbar?.contains(event.target) || this.policyDock?.contains(event.target)) {
+        if (this.toolbar?.contains(event.target) || this.policyDock?.contains(event.target) || this.footerModalHost?.contains(event.target)) {
           return;
         }
         this.closePanels();
@@ -838,7 +942,10 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       this.toolbar = null;
       this.policyDock?.remove();
       this.policyDock = null;
+      this.footerModalHost?.remove();
+      this.footerModalHost = null;
       this.panelBodies.clear();
+      this.cleanupExtensionSettings();
       for (const node of this.hiddenOriginalNodes) {
         node.classList?.remove(HIDDEN_CLASS);
       }
@@ -901,6 +1008,8 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
         this.installToolbar();
         this.hideOriginalSections();
         this.installPolicyDock();
+        this.installExtensionSettings();
+        this.syncWatermark();
         this.syncUsernameAnimation();
       }, 0);
     }
@@ -1009,12 +1118,20 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       if (links.length === 0 && games.length === 0) {
         this.policyDock?.remove();
         this.policyDock = null;
+        this.footerModalHost?.remove();
+        this.footerModalHost = null;
         return;
       }
       if (!this.policyDock) {
         this.policyDock = this.createPolicyDock();
         this.document.body?.appendChild(this.policyDock);
       }
+      if (!this.footerModalHost) {
+        this.footerModalHost = this.createFooterModalHost();
+        this.document.body?.appendChild(this.footerModalHost);
+      }
+      this.ensureDockPanel("policy", links.length > 0);
+      this.ensureDockPanel("games", games.length > 0);
     }
     createPolicyDock() {
       const dock = this.document.createElement("div");
@@ -1023,14 +1140,28 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       buttons.classList.add("blobio-dock-buttons");
       if (this.getPolicyPanelLinks().length > 0) {
         buttons.appendChild(this.createDockButton("Policy", "policy", "blobio-policy-button"));
-        dock.appendChild(this.createPanel("policy", ""));
       }
       if (this.getOtherProjectLinks().length > 0) {
         buttons.appendChild(this.createDockButton("Other Games", "games", "blobio-games-button"));
-        dock.appendChild(this.createPanel("games", ""));
       }
-      dock.insertBefore(buttons, dock.children[0] || null);
+      dock.appendChild(buttons);
       return dock;
+    }
+    createFooterModalHost() {
+      const host = this.document.createElement("div");
+      host.classList.add("blobio-footer-modal-host");
+      return host;
+    }
+    ensureDockPanel(panelName, shouldExist) {
+      const existingPanel = this.document.getElementById?.(`blobio-panel-${panelName}`);
+      if (!shouldExist) {
+        existingPanel?.remove();
+        this.panelBodies.delete(panelName);
+        return;
+      }
+      if (!existingPanel && this.footerModalHost) {
+        this.footerModalHost.appendChild(this.createPanel(panelName, ""));
+      }
     }
     createDockButton(label, panelName, className) {
       const button = this.document.createElement("button");
@@ -1178,6 +1309,204 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       }
       body.appendChild(links);
     }
+    installExtensionSettings() {
+      const settingsPanels = Array.from(this.document.querySelectorAll?.("app-settings") || []);
+      for (const settings of settingsPanels) {
+        if (this.isInsideOwnUi(settings)) {
+          continue;
+        }
+        const left = settings.querySelector?.(".left");
+        const tabs = left?.querySelector?.("ul");
+        const right = settings.querySelector?.(".right");
+        const content = right?.querySelector?.(".content-container");
+        if (!tabs || !content) {
+          continue;
+        }
+        let tab = settings.querySelector?.(".blobio-extension-settings-tab");
+        let panel = settings.querySelector?.(".blobio-extension-settings-panel");
+        if (!tab) {
+          tab = this.createExtensionSettingsTab(settings);
+          tabs.appendChild(tab);
+        }
+        if (!panel) {
+          panel = this.createExtensionSettingsPanel();
+          content.appendChild(panel);
+        }
+        this.syncWatermarkCheckbox(panel);
+        if (tab.dataset.blobioExtensionListener !== "true") {
+          tab.dataset.blobioExtensionListener = "true";
+          this.addSettingsListener(tab, "click", (event) => {
+            event.stopPropagation?.();
+            this.activateExtensionSettings(settings);
+          });
+        }
+        for (const item of tabs.children || []) {
+          if (item === tab) {
+            continue;
+          }
+          if (item.dataset.blobioExtensionCloseListener !== "true") {
+            item.dataset.blobioExtensionCloseListener = "true";
+            this.addSettingsListener(item, "click", () => {
+              this.deactivateExtensionSettings(settings);
+            });
+          }
+        }
+      }
+    }
+    createExtensionSettingsTab(settings) {
+      const tab = this.document.createElement("li");
+      tab.classList.add("blobio-extension-settings-tab");
+      tab.setAttribute("_ngcontent-c3", "");
+      tab.textContent = "Extension";
+      tab.dataset.settingsPanel = "extension";
+      return tab;
+    }
+    createExtensionSettingsPanel() {
+      const panel = this.document.createElement("div");
+      panel.classList.add("grid-container", "blobio-extension-settings-panel");
+      panel.setAttribute("_ngcontent-c3", "");
+      const row = this.document.createElement("div");
+      row.classList.add("grid-item", "blobio-extension-setting-row");
+      row.setAttribute("_ngcontent-c3", "");
+      const switchLabel = this.document.createElement("label");
+      switchLabel.classList.add("switch");
+      switchLabel.setAttribute("_ngcontent-c3", "");
+      const checkbox = this.document.createElement("input");
+      checkbox.id = "config-switch-watermark";
+      checkbox.type = "checkbox";
+      checkbox.checked = this.isWatermarkEnabled();
+      checkbox.classList.add("ng-untouched", "ng-pristine", "ng-valid");
+      checkbox.setAttribute("_ngcontent-c3", "");
+      checkbox.setAttribute("type", "checkbox");
+      const slider = this.document.createElement("span");
+      slider.classList.add("slider");
+      slider.setAttribute("_ngcontent-c3", "");
+      const textLabel = this.document.createElement("label");
+      textLabel.setAttribute("_ngcontent-c3", "");
+      textLabel.setAttribute("for", checkbox.id);
+      textLabel.textContent = "WaterMark";
+      switchLabel.append(checkbox, slider);
+      row.append(switchLabel, textLabel);
+      panel.appendChild(row);
+      this.addSettingsListener(checkbox, "change", () => {
+        this.setWatermarkEnabled(Boolean(checkbox.checked));
+        this.syncWatermark();
+      });
+      return panel;
+    }
+    activateExtensionSettings(settings) {
+      const left = settings.querySelector?.(".left");
+      const extensionTab = settings.querySelector?.(".blobio-extension-settings-tab");
+      for (const item of left?.querySelector?.("ul")?.children || []) {
+        item.classList?.remove("active");
+      }
+      settings.classList.add("blobio-extension-settings-active");
+      extensionTab?.classList.add("active");
+    }
+    deactivateExtensionSettings(settings) {
+      settings.classList.remove("blobio-extension-settings-active");
+      settings.querySelector?.(".blobio-extension-settings-tab")?.classList.remove("active");
+    }
+    syncWatermarkCheckbox(panel) {
+      const checkbox = panel.querySelector?.("#config-switch-watermark");
+      if (checkbox) {
+        checkbox.checked = this.isWatermarkEnabled();
+      }
+    }
+    addSettingsListener(node, type, handler) {
+      node.addEventListener?.(type, handler);
+      this.settingsListeners.push({ node, type, handler });
+    }
+    cleanupExtensionSettings() {
+      for (const { node, type, handler } of this.settingsListeners) {
+        node.removeEventListener?.(type, handler);
+      }
+      this.settingsListeners = [];
+      for (const settings of this.document.querySelectorAll?.("app-settings") || []) {
+        settings.classList?.remove("blobio-extension-settings-active");
+      }
+      for (const node of this.document.querySelectorAll?.(".blobio-extension-settings-tab, .blobio-extension-settings-panel") || []) {
+        node.remove();
+      }
+      this.removeWatermarks();
+    }
+    isWatermarkEnabled() {
+      try {
+        return this.storage?.getItem?.(WATERMARK_STORAGE_KEY) === "1";
+      } catch (error) {
+        this.logger.warn("[Blobio] Could not read WaterMark setting.", error);
+        return false;
+      }
+    }
+    setWatermarkEnabled(enabled) {
+      try {
+        this.storage?.setItem?.(WATERMARK_STORAGE_KEY, enabled ? "1" : "0");
+      } catch (error) {
+        this.logger.warn("[Blobio] Could not save WaterMark setting.", error);
+      }
+    }
+    syncWatermark() {
+      if (!this.isWatermarkEnabled()) {
+        this.removeWatermarks();
+        return;
+      }
+      const nameInput = this.findNameInput();
+      if (!nameInput?.parentNode) {
+        return;
+      }
+      let watermark = this.document.querySelector?.(".blobio-watermark");
+      if (!watermark) {
+        watermark = this.createWatermark();
+      }
+      if (watermark.parentNode !== nameInput.parentNode || watermark.parentNode.children.indexOf(watermark) !== watermark.parentNode.children.indexOf(nameInput) - 1) {
+        nameInput.parentNode.insertBefore(watermark, nameInput);
+      }
+    }
+    createWatermark() {
+      const watermark = this.document.createElement("div");
+      watermark.classList.add("blobio-watermark");
+      const prefix = this.document.createElement("span");
+      prefix.classList.add("blobio-watermark-prefix");
+      prefix.textContent = "Blob-";
+      const extension = this.document.createElement("span");
+      extension.classList.add("blobio-watermark-extension");
+      extension.textContent = "Extension";
+      const version = this.document.createElement("span");
+      version.classList.add("blobio-watermark-version");
+      version.textContent = ` v${this.version}`;
+      watermark.append(prefix, extension, version);
+      return watermark;
+    }
+    removeWatermarks() {
+      for (const watermark of this.document.querySelectorAll?.(".blobio-watermark") || []) {
+        watermark.remove();
+      }
+    }
+    findNameInput() {
+      const containers = [
+        this.document.querySelector?.(".inputs-container"),
+        this.document.getElementById?.("game-wrapper"),
+        this.document.body
+      ].filter(Boolean);
+      for (const container of containers) {
+        const inputs = Array.from(container.querySelectorAll?.("input") || []);
+        const namedInput = inputs.find((input) => {
+          const label = `${input.id || ""} ${input.getAttribute?.("name") || ""} ${input.getAttribute?.("placeholder") || ""}`;
+          return /nick|name/i.test(label);
+        });
+        if (namedInput) {
+          return namedInput;
+        }
+        const textInput = inputs.find((input) => {
+          const type = input.getAttribute?.("type") || input.type || "";
+          return (!type || type === "text") && !input.readOnly && input.getAttribute?.("readonly") === null;
+        });
+        if (textInput) {
+          return textInput;
+        }
+      }
+      return null;
+    }
     togglePanel(panelName) {
       const panel = this.document.getElementById?.(`blobio-panel-${panelName}`);
       if (!panel) {
@@ -1198,7 +1527,6 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
         return;
       }
       panel.classList.add("is-open");
-      this.setDockFocus(panelName);
       for (const button of this.getPanelButtons()) {
         if (button.dataset.panel === panelName) {
           button.classList.add("is-active");
@@ -1212,19 +1540,6 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       for (const button of this.getPanelButtons()) {
         button.classList.remove("is-active");
       }
-      this.clearDockFocus();
-    }
-    setDockFocus(panelName) {
-      this.clearDockFocus();
-      if (panelName === "policy") {
-        this.policyDock?.classList.add("is-focusing-policy");
-      } else if (panelName === "games") {
-        this.policyDock?.classList.add("is-focusing-games");
-      }
-    }
-    clearDockFocus() {
-      this.policyDock?.classList.remove("is-focusing-policy");
-      this.policyDock?.classList.remove("is-focusing-games");
     }
     findReplayButton() {
       const candidates = Array.from(this.document.querySelectorAll?.('button, a, [role="button"]') || []);
@@ -1497,7 +1812,7 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
       }
     }
     isInsideOwnUi(node) {
-      return Boolean(node && (this.toolbar?.contains(node) || this.policyDock?.contains(node)));
+      return Boolean(node && (this.toolbar?.contains(node) || this.policyDock?.contains(node) || this.footerModalHost?.contains(node)));
     }
     isInsideOriginalFooter(node) {
       let current = node;
@@ -1512,7 +1827,7 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
     getPanels() {
       return [
         ...Array.from(this.toolbar?.querySelectorAll(".blobio-menu-panel") || []),
-        ...Array.from(this.policyDock?.querySelectorAll(".blobio-menu-panel") || [])
+        ...Array.from(this.footerModalHost?.querySelectorAll(".blobio-menu-panel") || [])
       ];
     }
     getPanelButtons() {

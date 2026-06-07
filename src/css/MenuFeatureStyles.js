@@ -350,7 +350,7 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
 .blobio-footer-dock {
   position: fixed;
   left: 50%;
-  bottom: 170px;
+  bottom: 10px;
   transform: translateX(-50%);
   z-index: 20;
   visibility: visible !important;
@@ -358,16 +358,12 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
 }
 
 .blobio-dock-buttons {
-  position: relative;
-  width: 230px;
-  height: 30px;
-  display: block;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
 .blobio-dock-button {
-  position: absolute;
-  top: 0;
-  left: 50%;
   padding: 5px 11px;
   border: 1px solid rgba(142, 255, 174, 0.68);
   border-radius: 8px;
@@ -379,31 +375,7 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   text-shadow: 0 0 6px rgba(118, 255, 154, 0.7);
   box-shadow: 0 0 12px rgba(79, 255, 130, 0.22), inset 0 0 8px rgba(79, 255, 130, 0.13);
   cursor: pointer;
-  transition: transform 180ms ease, background 150ms ease, box-shadow 150ms ease;
-}
-
-.blobio-policy-button {
-  transform: translateX(calc(-100% - 4px));
-}
-
-.blobio-games-button {
-  transform: translateX(4px);
-}
-
-.blobio-footer-dock.is-focusing-policy .blobio-policy-button {
-  transform: translateX(-50%);
-}
-
-.blobio-footer-dock.is-focusing-games .blobio-games-button {
-  transform: translateX(-50%);
-}
-
-.blobio-footer-dock.is-focusing-policy .blobio-games-button {
-  transform: translateX(calc(-100% - 36px));
-}
-
-.blobio-footer-dock.is-focusing-games .blobio-policy-button {
-  transform: translateX(56px);
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
 
 .blobio-dock-button:hover,
@@ -412,20 +384,31 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   box-shadow: 0 0 16px rgba(99, 255, 142, 0.34), inset 0 0 10px rgba(99, 255, 142, 0.18);
 }
 
-.blobio-footer-dock .blobio-menu-panel {
-  top: calc(100% + 8px);
+.blobio-footer-modal-host {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482500;
+  visibility: visible !important;
+  pointer-events: none;
+}
+
+.blobio-footer-modal-host .blobio-menu-panel {
+  position: fixed;
+  top: 50%;
   right: auto;
   bottom: auto;
   left: 50%;
-  width: min(360px, calc(100vw - 28px));
-  max-height: 150px;
-  overflow: auto;
-  transform: translateX(-50%) translateY(-8px) scaleY(0.96);
-  transform-origin: top center;
+  width: min(430px, calc(100vw - 32px));
+  max-height: 0;
+  overflow: hidden;
+  transform: translate(-50%, -48%) scale(0.96);
+  transform-origin: center;
 }
 
-.blobio-footer-dock .blobio-menu-panel.is-open {
-  transform: translateX(-50%) translateY(0) scaleY(1);
+.blobio-footer-modal-host .blobio-menu-panel.is-open {
+  max-height: min(520px, calc(100vh - 72px));
+  overflow: auto;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .blobio-policy-links {
@@ -493,6 +476,84 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   box-shadow: 0 0 16px rgba(92, 255, 132, 0.38), inset 0 0 8px rgba(91, 255, 132, 0.18);
 }
 
+html.${className} app-settings .blobio-extension-settings-tab {
+  color: #dfffe6;
+  font-weight: 800;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 16px rgba(79, 255, 130, 0.28);
+}
+
+html.${className} app-settings .blobio-extension-settings-tab.active {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(190, 255, 204, 0.94), 0 0 22px rgba(99, 255, 142, 0.48);
+}
+
+html.${className} app-settings .blobio-extension-settings-panel {
+  display: none;
+}
+
+html.${className} app-settings.blobio-extension-settings-active .content-container > :not(.blobio-extension-settings-panel) {
+  display: none !important;
+}
+
+html.${className} app-settings.blobio-extension-settings-active .blobio-extension-settings-panel {
+  display: grid;
+}
+
+html.${className} app-settings .blobio-extension-setting-row {
+  color: #dfffe6;
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.62);
+}
+
+html.${className} app-settings .blobio-extension-setting-row label[for="config-switch-watermark"] {
+  color: #dfffe6;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.62);
+}
+
+html.${className} .blobio-watermark {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+html.${className} .blobio-watermark-prefix {
+  color: #dfffe6;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 18px rgba(79, 255, 130, 0.28);
+}
+
+html.${className} .blobio-watermark-version {
+  color: #dfffe6;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72), 0 0 18px rgba(79, 255, 130, 0.28);
+}
+
+html.${className} .blobio-watermark-extension {
+  position: relative;
+  display: inline-block;
+  color: transparent;
+  background: linear-gradient(90deg, #dfffe6, #ffffff, #64ff8b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 8px rgba(118, 255, 154, 0.34);
+}
+
+html.${className} .blobio-watermark-extension::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(196, 255, 209, 0), rgba(255, 255, 255, 0.95), rgba(99, 255, 139, 0.86), rgba(196, 255, 209, 0));
+  transform-origin: left center;
+  animation: blobio-watermark-underline 5000ms ease-in-out infinite;
+}
+
 @keyframes blobio-social-glow {
   from {
     transform: scale(1);
@@ -502,6 +563,32 @@ html.${className} .fleft.username .blobio-username-animated .blobio-username-let
   to {
     transform: scale(1.03);
     text-shadow: 0 0 12px rgba(172, 255, 187, 0.94), 0 0 26px rgba(95, 255, 132, 0.48);
+  }
+}
+
+@keyframes blobio-watermark-underline {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  }
+
+  12% {
+    opacity: 1;
+    transform: scaleX(1);
+    filter: drop-shadow(0 0 7px rgba(180, 255, 199, 0.95));
+  }
+
+  28% {
+    opacity: 0;
+    transform: scaleX(1);
+    filter: drop-shadow(0 0 1px rgba(99, 255, 139, 0.2));
+  }
+
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+    filter: drop-shadow(0 0 1px rgba(99, 255, 139, 0.2));
   }
 }
 

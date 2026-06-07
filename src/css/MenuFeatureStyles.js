@@ -8,6 +8,10 @@ html.${className} .${hiddenClass} {
   display: none !important;
 }
 
+html.${className} footer.footer {
+  display: none !important;
+}
+
 html.${className} .aside.aside-2 {
   max-width: 260px !important;
   padding: 8px !important;
@@ -40,21 +44,56 @@ html.${className} img.inputs-background-img {
 html.${className} .inputs-container input,
 html.${className} .inputs-container .choose-skin-btn,
 html.${className} .inputs-container button,
-html.${className} #game-wrapper .custom-select {
+html.${className} #game-wrapper .custom-select,
+html.${className} .progress-bar,
+html.${className} .progress-bar-title {
   border: 1px solid rgba(142, 255, 174, 0.42) !important;
   border-radius: 8px !important;
   background-color: rgba(3, 28, 17, 0.46) !important;
   box-shadow: 0 0 13px rgba(79, 255, 130, 0.24), inset 0 0 10px rgba(79, 255, 130, 0.12) !important;
 }
 
-html.${className} .inputs-container input {
-  color: #eaffee !important;
-  text-shadow: 0 0 5px rgba(118, 255, 154, 0.55) !important;
+html.${className} .inputs-container input,
+html.${className} .inputs-container .choose-skin-btn,
+html.${className} .inputs-container button,
+html.${className} #game-wrapper .custom-select-display,
+html.${className} #game-wrapper .custom-select-option,
+html.${className} .progress-bar,
+html.${className} .progress-bar-title {
+  color: #dfffe6 !important;
+  fill: currentColor !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.62) !important;
+}
+
+html.${className} #game-wrapper .custom-select-display {
+  background: rgba(3, 28, 17, 0.46) !important;
+}
+
+html.${className} #game-wrapper .custom-select-option {
+  background: rgba(3, 44, 23, 0.78) !important;
 }
 
 html.${className} .progress-bar {
   border: 1px solid rgba(142, 255, 174, 0.38) !important;
+  background: rgba(3, 44, 23, 0.46) !important;
   box-shadow: 0 0 14px rgba(79, 255, 130, 0.24), inset 0 0 10px rgba(79, 255, 130, 0.12) !important;
+}
+
+html.${className} .progress-bar-title {
+  background: transparent !important;
+}
+
+html.${className} #game-wrapper .custom-select-options {
+  border: 1px solid rgba(142, 255, 174, 0.42) !important;
+  border-radius: 8px !important;
+  background: rgba(3, 44, 23, 0.92) !important;
+  box-shadow: 0 0 13px rgba(79, 255, 130, 0.24), inset 0 0 10px rgba(79, 255, 130, 0.12) !important;
+}
+
+html.${className} #game-wrapper .custom-select-option.selected,
+html.${className} #game-wrapper .custom-select-option:hover {
+  background: rgba(10, 69, 35, 0.7) !important;
 }
 
 html.${className} #ip-container table {
@@ -88,7 +127,6 @@ html.${className} #custom-host-input {
   display: inline-block;
   margin-left: 0;
   vertical-align: top;
-  z-index: 2147482500;
 }
 
 .${toolbarClass}.is-floating {
@@ -101,8 +139,14 @@ html.${className} #custom-host-input {
 .blobio-menu-buttons {
   display: inline-block;
   position: relative;
-  top: -3px;
+  top: 0;
   white-space: nowrap;
+}
+
+.blobio-menu-button {
+  background-size: 96% 96% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 .blobio-menu-label {
@@ -115,6 +159,7 @@ html.${className} #custom-host-input {
 
 .blobio-menu-panel {
   position: absolute;
+  z-index: 2147482500;
   top: calc(100% + 8px);
   left: 0;
   width: min(360px, calc(100vw - 32px));

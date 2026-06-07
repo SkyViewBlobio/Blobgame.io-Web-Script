@@ -198,7 +198,7 @@ function addOtherProjectLinks(document) {
   footer.appendChild(partner);
   document.body.appendChild(footer);
 
-  return { partner, clicks };
+  return { footer, partner, clicks };
 }
 
 function addFailedViralFrame(document) {
@@ -248,7 +248,11 @@ test('MenuFeature injects toolbar buttons next to the Replay button and hides or
   assert.equal(buttons[0].style.padding, undefined);
   assert.equal(buttons[0].style.border, undefined);
   assert.equal(buttons[0].style.backgroundColor, undefined);
-  assert.doesNotMatch(style.textContent, /\.blobio-menu-button\s*{/);
+  const toolbarCss = style.textContent.match(/\.blobio-menu-toolbar\s*{[^}]*}/)?.[0] || '';
+  assert.match(style.textContent, /\.blobio-menu-button\s*{[\s\S]*background-size: 96% 96% !important;/);
+  assert.match(style.textContent, /\.blobio-menu-buttons\s*{[\s\S]*top: 0;/);
+  assert.match(style.textContent, /\.blobio-menu-panel\s*{[\s\S]*z-index: 2147482500;/);
+  assert.doesNotMatch(toolbarCss, /z-index: 2147482500;/);
   assert.match(toolbar.textContent, /Featured/);
   assert.match(toolbar.textContent, /Updates/);
   assert.match(toolbar.textContent, /Socials/);
@@ -477,7 +481,7 @@ test('MenuFeature folds other project icons into a transparent games dropdown', 
   const document = createFakeDocument();
   addReplayButton(document);
   addOriginalPolicyLinks(document);
-  const { partner, clicks } = addOtherProjectLinks(document);
+  const { footer, partner, clicks } = addOtherProjectLinks(document);
 
   const feature = new MenuFeature({ document, assets });
   feature.start();
@@ -487,6 +491,7 @@ test('MenuFeature folds other project icons into a transparent games dropdown', 
   const gamesButton = dock.querySelectorAll('button').find((button) => button.dataset.panel === 'games');
   const gamesPanel = document.getElementById('blobio-panel-games');
 
+  assert.equal(footer.classList.contains('blobio-original-hidden'), true);
   assert.equal(partner.classList.contains('blobio-original-hidden'), true);
   assert.notEqual(gamesButton, undefined);
   assert.match(gamesButton.className, /blobio-dock-button/);
@@ -506,6 +511,7 @@ test('MenuFeature folds other project icons into a transparent games dropdown', 
 
   feature.destroy();
 
+  assert.equal(footer.classList.contains('blobio-original-hidden'), false);
   assert.equal(partner.classList.contains('blobio-original-hidden'), false);
 });
 
@@ -524,6 +530,11 @@ test('MenuFeature CSS hides the inputs image and frames main menu fields with gr
   assert.match(style, /#ip-container table\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.48\)/);
   assert.match(style, /#custom-host-input\s*{[\s\S]*font-weight: 700/);
   assert.match(style, /#custom-host-input\s*{[\s\S]*background: rgba\(0, 0, 0, 0\.62\)/);
+  assert.match(style, /\.inputs-container input\s*,[\s\S]*\.inputs-container button\s*,[\s\S]*#game-wrapper \.custom-select-display\s*,[\s\S]*#game-wrapper \.custom-select-option\s*,[\s\S]*\.progress-bar\s*,[\s\S]*\.progress-bar-title\s*{[\s\S]*color: #dfffe6 !important;/);
+  assert.match(style, /#game-wrapper \.custom-select-display\s*{[\s\S]*background: rgba\(3, 28, 17, 0\.46\) !important;/);
+  assert.match(style, /#game-wrapper \.custom-select-option\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.78\) !important;/);
+  assert.match(style, /\.progress-bar\s*{[\s\S]*background: rgba\(3, 44, 23, 0\.46\) !important;/);
+  assert.match(style, /footer\.footer\s*{[\s\S]*display: none !important;/);
 
   feature.destroy();
 });

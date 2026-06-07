@@ -821,6 +821,7 @@ export class MenuFeature {
       '.ytmCuedOverlayGradient',
       '.history-wrapper',
       '.social',
+      'footer.footer',
     ];
 
     for (const selector of directSelectors) {

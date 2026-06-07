@@ -119,6 +119,7 @@ export class MenuFeature {
     this.installToolbar();
     this.hideOriginalSections();
     this.installPolicyDock();
+    this.syncUsernameAnimation();
     this.watchPage();
 
     this.documentClickHandler = (event) => {
@@ -240,6 +241,7 @@ export class MenuFeature {
       this.installToolbar();
       this.hideOriginalSections();
       this.installPolicyDock();
+      this.syncUsernameAnimation();
     }, 0);
   }
 
@@ -894,6 +896,52 @@ export class MenuFeature {
 
     node.classList?.add(HIDDEN_CLASS);
     this.hiddenOriginalNodes.add(node);
+  }
+
+  syncUsernameAnimation() {
+    const usernames = Array.from(this.document.querySelectorAll?.('.fleft.username') || []);
+
+    for (const username of usernames) {
+      if (this.isInsideOwnUi(username)) {
+        continue;
+      }
+
+      const text = (username.textContent || '').trim();
+      const currentText = username.dataset.blobioUsernameText || '';
+      const existingLetters = username.querySelectorAll?.('.blobio-username-letter') || [];
+
+      if (!text || (text === currentText && existingLetters.length === Array.from(text).length)) {
+        continue;
+      }
+
+      this.clearElement(username);
+      username.dataset.blobioUsernameText = text;
+
+      const letters = Array.from(text);
+      const duration = letters.length * 160 + 5200;
+      const glowDelay = Math.max(0, (letters.length - 1) * 160 + 1250);
+      this.setStyleProperty(username, '--blobio-username-duration', `${duration}ms`);
+      this.setStyleProperty(username, '--blobio-username-glow-delay', `${glowDelay}ms`);
+
+      letters.forEach((letter, index) => {
+        const span = this.document.createElement('span');
+        span.classList.add('blobio-username-letter');
+        span.textContent = letter;
+        this.setStyleProperty(span, '--blobio-letter-delay', `${index * 160}ms`);
+        username.appendChild(span);
+      });
+    }
+  }
+
+  setStyleProperty(node, name, value) {
+    if (typeof node.style?.setProperty === 'function') {
+      node.style.setProperty(name, value);
+      return;
+    }
+
+    if (node.style) {
+      node.style[name] = value;
+    }
   }
 
   isInsideOwnUi(node) {

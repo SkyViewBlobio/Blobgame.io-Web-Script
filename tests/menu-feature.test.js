@@ -35,6 +35,14 @@ function addReplayButton(document) {
   return { controls, replayButton };
 }
 
+function addUsername(document, text = 'SkyView') {
+  const username = document.createElement('div');
+  username.classList.add('fleft', 'username');
+  username.textContent = text;
+  document.body.appendChild(username);
+  return username;
+}
+
 function addOriginalSocialLinks(document) {
   const social = document.createElement('div');
   social.classList.add('social');
@@ -547,11 +555,50 @@ test('MenuFeature CSS hides the inputs image and frames main menu fields with gr
   assert.match(style, /footer\.footer\s*{[\s\S]*visibility: hidden !important;/);
   const footerCss = style.match(/footer\.footer\s*{[^}]*}/)?.[0] || '';
   assert.doesNotMatch(footerCss, /display: none !important;/);
+  assert.match(style, /footer\.footer \*\s*{[\s\S]*visibility: hidden !important;/);
+  const footerDescendantCss = style.match(/footer\.footer \*\s*{[^}]*}/)?.[0] || '';
+  assert.doesNotMatch(footerDescendantCss, /display: none !important;/);
   assert.match(style, /\.blobio-panel-close\s*{[\s\S]*display: inline-flex;/);
   assert.match(style, /\.blobio-panel-close\s*{[\s\S]*background: rgba\(102, 10, 16, 0\.92\);/);
   assert.match(style, /\.blobio-panel-close\s*{[\s\S]*color: #fff;/);
-  assert.match(style, /\.fleft\.username\s*{[\s\S]*animation: blobio-username-shine/);
-  assert.match(style, /@keyframes blobio-username-shine/);
+  assert.match(style, /\.fleft\.username\s*{[\s\S]*color: #dfffe6 !important;/);
+  assert.match(style, /\.blobio-username-letter\s*{[\s\S]*animation-name: blobio-username-letter-wave, blobio-username-all-glow;/);
+  assert.doesNotMatch(style, /\.blobio-username-letter:last-child/);
+  assert.match(style, /@keyframes blobio-username-letter-wave/);
+  assert.match(style, /@keyframes blobio-username-all-glow/);
+
+  feature.destroy();
+});
+
+test('MenuFeature splits logged-in username into staggered animated letters', () => {
+  const document = createFakeDocument();
+  addReplayButton(document);
+  const username = addUsername(document, 'Sky');
+
+  const feature = new MenuFeature({ document, assets });
+  feature.start();
+
+  let letters = username.querySelectorAll('.blobio-username-letter');
+  assert.equal(username.dataset.blobioUsernameText, 'Sky');
+  assert.equal(letters.length, 3);
+  assert.deepEqual(letters.map((letter) => letter.textContent), ['S', 'k', 'y']);
+  assert.equal(username.style['--blobio-username-glow-delay'], '1570ms');
+  assert.equal(letters[0].style['--blobio-letter-delay'], '0ms');
+  assert.equal(letters[1].style['--blobio-letter-delay'], '160ms');
+  assert.equal(letters[2].style['--blobio-letter-delay'], '320ms');
+
+  while (username.children.length > 0) {
+    username.children[0].remove();
+  }
+
+  username.textContent = 'Blob';
+  feature.syncUsernameAnimation();
+
+  letters = username.querySelectorAll('.blobio-username-letter');
+  assert.equal(username.dataset.blobioUsernameText, 'Blob');
+  assert.equal(letters.length, 4);
+  assert.deepEqual(letters.map((letter) => letter.textContent), ['B', 'l', 'o', 'b']);
+  assert.equal(username.style['--blobio-username-glow-delay'], '1730ms');
 
   feature.destroy();
 });

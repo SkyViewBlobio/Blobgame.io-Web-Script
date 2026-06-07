@@ -168,6 +168,11 @@ html.${className} footer.footer {
   pointer-events: none !important;
 }
 
+html.${className} footer.footer * {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 html.${className} .aside.aside-2 {
   max-width: 260px !important;
   padding: 8px !important;
@@ -280,14 +285,21 @@ html.${className} #custom-host-input {
 
 html.${className} .fleft.username {
   color: #dfffe6 !important;
-  background-image: linear-gradient(110deg, #dfffe6 0%, #dfffe6 38%, #ffffff 50%, #dfffe6 62%, #dfffe6 100%) !important;
-  background-size: 250% 100% !important;
-  background-position: 120% 0 !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
   text-shadow: 0 0 7px rgba(118, 255, 154, 0.72) !important;
-  animation: blobio-username-shine 5600ms ease-in-out infinite;
+  white-space: nowrap !important;
+}
+
+html.${className} .fleft.username .blobio-username-letter {
+  display: inline-block;
+  color: #dfffe6;
+  transform-origin: center bottom;
+  text-shadow: 0 0 7px rgba(118, 255, 154, 0.72);
+  animation-name: blobio-username-letter-wave, blobio-username-all-glow;
+  animation-duration: var(--blobio-username-duration, 5200ms), var(--blobio-username-duration, 5200ms);
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+  animation-delay: var(--blobio-letter-delay, 0ms), var(--blobio-username-glow-delay, 0ms);
+  will-change: transform, text-shadow, color;
 }
 
 .${toolbarClass} {
@@ -605,15 +617,33 @@ html.${className} .fleft.username {
   }
 }
 
-@keyframes blobio-username-shine {
+@keyframes blobio-username-letter-wave {
   0%,
-  62% {
-    background-position: 120% 0;
+  4%,
+  22%,
+  100% {
+    transform: translateY(0) scale(1);
+    color: #dfffe6;
+    text-shadow: 0 0 7px rgba(118, 255, 154, 0.72);
   }
 
-  82%,
+  10% {
+    transform: translateY(-2px) scale(1.22);
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(190, 255, 204, 0.94), 0 0 18px rgba(99, 255, 142, 0.54);
+  }
+}
+
+@keyframes blobio-username-all-glow {
+  0%,
+  5%,
+  18%,
   100% {
-    background-position: -120% 0;
+    text-shadow: 0 0 7px rgba(118, 255, 154, 0.72);
+  }
+
+  10% {
+    text-shadow: 0 0 12px rgba(220, 255, 228, 1), 0 0 28px rgba(99, 255, 142, 0.82);
   }
 }
 `.trim();
@@ -732,6 +762,7 @@ html.${className} .fleft.username {
       this.installToolbar();
       this.hideOriginalSections();
       this.installPolicyDock();
+      this.syncUsernameAnimation();
       this.watchPage();
       this.documentClickHandler = (event) => {
         if (this.toolbar?.contains(event.target) || this.policyDock?.contains(event.target)) {
@@ -828,6 +859,7 @@ html.${className} .fleft.username {
         this.installToolbar();
         this.hideOriginalSections();
         this.installPolicyDock();
+        this.syncUsernameAnimation();
       }, 0);
     }
     clearRefreshTimer() {
@@ -1341,6 +1373,43 @@ html.${className} .fleft.username {
       }
       node.classList?.add(HIDDEN_CLASS);
       this.hiddenOriginalNodes.add(node);
+    }
+    syncUsernameAnimation() {
+      const usernames = Array.from(this.document.querySelectorAll?.(".fleft.username") || []);
+      for (const username of usernames) {
+        if (this.isInsideOwnUi(username)) {
+          continue;
+        }
+        const text = (username.textContent || "").trim();
+        const currentText = username.dataset.blobioUsernameText || "";
+        const existingLetters = username.querySelectorAll?.(".blobio-username-letter") || [];
+        if (!text || text === currentText && existingLetters.length === Array.from(text).length) {
+          continue;
+        }
+        this.clearElement(username);
+        username.dataset.blobioUsernameText = text;
+        const letters = Array.from(text);
+        const duration = letters.length * 160 + 5200;
+        const glowDelay = Math.max(0, (letters.length - 1) * 160 + 1250);
+        this.setStyleProperty(username, "--blobio-username-duration", `${duration}ms`);
+        this.setStyleProperty(username, "--blobio-username-glow-delay", `${glowDelay}ms`);
+        letters.forEach((letter, index) => {
+          const span = this.document.createElement("span");
+          span.classList.add("blobio-username-letter");
+          span.textContent = letter;
+          this.setStyleProperty(span, "--blobio-letter-delay", `${index * 160}ms`);
+          username.appendChild(span);
+        });
+      }
+    }
+    setStyleProperty(node, name, value) {
+      if (typeof node.style?.setProperty === "function") {
+        node.style.setProperty(name, value);
+        return;
+      }
+      if (node.style) {
+        node.style[name] = value;
+      }
     }
     isInsideOwnUi(node) {
       return Boolean(node && (this.toolbar?.contains(node) || this.policyDock?.contains(node)));

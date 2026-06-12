@@ -21,7 +21,7 @@ html.${className} footer.footer * {
 }
 
 html.${className} .blobio-main-menu-align-target {
-  transform: translateX(-14px) !important;
+  transform: translateX(-22px) !important;
   transition: transform 160ms ease;
 }
 
@@ -529,6 +529,15 @@ html.${className} app-settings.blobio-extension-settings-active .content-contain
   display: none !important;
 }
 
+html.${className} app-settings.blobio-extension-settings-active .inner-container {
+  background: rgba(2, 32, 18, 0.9) !important;
+  box-shadow: inset 0 0 22px rgba(79, 255, 130, 0.12), 0 0 18px rgba(79, 255, 130, 0.16) !important;
+}
+
+html.${className} app-settings.blobio-extension-settings-active .content-container {
+  background: transparent !important;
+}
+
 html.${className} app-settings.blobio-extension-settings-active .blobio-extension-settings-panel {
   display: grid;
 }
@@ -540,11 +549,22 @@ html.${className} app-settings .blobio-extension-setting-row {
   padding: 10px 12px;
   border: 1px solid rgba(142, 255, 174, 0.34);
   border-radius: 8px;
-  background: rgba(2, 18, 12, 0.72);
+  background: rgba(4, 42, 23, 0.82);
   color: #dfffe6;
   font-weight: 700;
   text-shadow: 0 0 6px rgba(118, 255, 154, 0.62);
   box-shadow: 0 0 14px rgba(79, 255, 130, 0.18), inset 0 0 10px rgba(79, 255, 130, 0.1);
+}
+
+html.${className} app-settings .blobio-extension-setting-row .slider {
+  border: 1px solid rgba(214, 255, 224, 0.72);
+  background-color: rgba(23, 96, 48, 0.86);
+  box-shadow: 0 0 12px rgba(118, 255, 154, 0.32), inset 0 0 7px rgba(255, 255, 255, 0.08);
+}
+
+html.${className} app-settings .blobio-extension-setting-row input:checked + .slider {
+  background-color: rgba(92, 204, 112, 0.92);
+  box-shadow: 0 0 16px rgba(118, 255, 154, 0.48), inset 0 0 8px rgba(255, 255, 255, 0.12);
 }
 
 html.${className} app-settings .blobio-extension-setting-row label[for="config-switch-watermark"] {
@@ -555,6 +575,23 @@ html.${className} app-settings .blobio-extension-setting-row label[for="config-s
 html.${className} app-settings .blobio-extension-setting-row label[for="config-switch-custom-imgur-skin"] {
   color: #dfffe6;
   text-shadow: 0 0 6px rgba(118, 255, 154, 0.62);
+}
+
+.blobio-extension-tooltip {
+  position: fixed;
+  z-index: 2147483600;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid rgba(142, 255, 174, 0.5);
+  border-radius: 8px;
+  background: rgba(2, 28, 16, 0.96);
+  color: #eaffee;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-shadow: 0 0 6px rgba(118, 255, 154, 0.46);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38), 0 0 16px rgba(79, 255, 130, 0.24);
+  pointer-events: none;
 }
 
 html.${className} app-skins .blobio-custom-skin-tab {

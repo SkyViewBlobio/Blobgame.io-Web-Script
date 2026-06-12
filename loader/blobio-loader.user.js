@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Blobio Web Script Loader
 // @namespace    https://github.com/SkyViewBlobio/Blobgame.io-Web-Script
-// @version      0.1.21
+// @version      0.1.22
 // @description  Loads the Blobio modular extension bundle from GitHub.
 // @match        *://blobgame.io/*
 // @match        *://custom.client.blobgame.io/*
@@ -24,14 +24,15 @@
   const CUSTOM_SKIN_ACTIVE_KEY = 'blobio.customSkin.activeUrl';
   const CUSTOM_SKIN_PREVIOUS_KEY = 'blobio.customSkin.previousSkin';
   const CUSTOM_SKIN_LOCAL_NAME_KEY = 'blobio.customSkin.localName';
+  const CUSTOM_SKIN_BASE_KEY = 'blobio.customSkin.baseSkin';
   const CUSTOM_SKIN_TYPE = 'free';
   const CUSTOM_SKIN_TYPES = ['free', 'premium'];
   const CUSTOM_SKIN_NAME = 'BlobioCustomSkin';
   const DIRECT_IMGUR_IMAGE_MATCH = /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i;
   const CUSTOM_CLIENT_HOST = 'custom.client.blobgame.io';
   const BUNDLE_URLS = [
-    'https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Web-Script/main/dist/blobio-extension.bundle.js?v=0.1.21',
-    'https://cdn.jsdelivr.net/gh/SkyViewBlobio/Blobgame.io-Web-Script@main/dist/blobio-extension.bundle.js?v=0.1.21',
+    'https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Web-Script/main/dist/blobio-extension.bundle.js?v=0.1.22',
+    'https://cdn.jsdelivr.net/gh/SkyViewBlobio/Blobgame.io-Web-Script@main/dist/blobio-extension.bundle.js?v=0.1.22',
   ];
 
   function logError(message, detail) {
@@ -122,6 +123,27 @@
     return localName;
   }
 
+  function getCustomSkinBaseSkin() {
+    try {
+      const raw = getSharedValue(CUSTOM_SKIN_BASE_KEY) || '';
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (
+        parsed &&
+        typeof parsed.name === 'string' &&
+        /^[a-z0-9_.-]+$/i.test(parsed.name) &&
+        typeof parsed.type === 'string' &&
+        CUSTOM_SKIN_TYPES.includes(parsed.type)
+      ) {
+        setLocalValue(CUSTOM_SKIN_BASE_KEY, JSON.stringify(parsed));
+        return parsed;
+      }
+    } catch {
+      // Bad stored data disables the custom skin bootstrap.
+    }
+
+    return null;
+  }
+
   function getCustomSkinState() {
     if (getSharedValue(CUSTOM_SKIN_ENABLED_KEY) !== '1') {
       return null;
@@ -132,9 +154,15 @@
       return null;
     }
 
+    const baseSkin = getCustomSkinBaseSkin();
+    if (!baseSkin) {
+      return null;
+    }
+
     return {
       activeUrl,
       localName: createLocalSkinName(),
+      baseSkin,
     };
   }
 
@@ -148,6 +176,7 @@
       enabled: true,
       activeUrl: state.activeUrl,
       localName: state.localName,
+      baseSkin: state.baseSkin,
       debug: getSharedValue('blobio.customSkin.debug') === '1',
     };
   }
@@ -161,6 +190,7 @@
   const CUSTOM_SKIN_ENABLED_KEY = ${JSON.stringify(CUSTOM_SKIN_ENABLED_KEY)};
   const CUSTOM_SKIN_ACTIVE_KEY = ${JSON.stringify(CUSTOM_SKIN_ACTIVE_KEY)};
   const CUSTOM_SKIN_LOCAL_NAME_KEY = ${JSON.stringify(CUSTOM_SKIN_LOCAL_NAME_KEY)};
+  const CUSTOM_SKIN_BASE_KEY = ${JSON.stringify(CUSTOM_SKIN_BASE_KEY)};
   const CUSTOM_SKIN_TYPE = ${JSON.stringify(CUSTOM_SKIN_TYPE)};
   const CUSTOM_SKIN_TYPES = ${JSON.stringify(CUSTOM_SKIN_TYPES)};
   const DIRECT_IMGUR_IMAGE_MATCH = /^https:\\/\\/i\\.imgur\\.com\\/[a-z0-9]+\\.(?:png|jpe?g|gif|webp)(?:\\?.*)?$/i;
@@ -206,16 +236,39 @@
     const enabled = getLocalValue(CUSTOM_SKIN_ENABLED_KEY);
     const activeUrl = getLocalValue(CUSTOM_SKIN_ACTIVE_KEY) || STATE.activeUrl || '';
     const localName = getLocalValue(CUSTOM_SKIN_LOCAL_NAME_KEY) || STATE.localName || '';
+    let baseSkin = STATE.baseSkin || null;
+
+    try {
+      const storedBaseSkin = JSON.parse(getLocalValue(CUSTOM_SKIN_BASE_KEY) || 'null');
+      if (
+        storedBaseSkin &&
+        typeof storedBaseSkin.name === 'string' &&
+        /^[a-z0-9_.-]+$/i.test(storedBaseSkin.name) &&
+        typeof storedBaseSkin.type === 'string' &&
+        CUSTOM_SKIN_TYPES.includes(storedBaseSkin.type)
+      ) {
+        baseSkin = storedBaseSkin;
+      }
+    } catch {
+      baseSkin = STATE.baseSkin || null;
+    }
 
     if (enabled !== null && enabled !== '1') {
       return null;
     }
 
-    if (!STATE.enabled || !DIRECT_IMGUR_IMAGE_MATCH.test(activeUrl) || !/^BlobioCustomSkin_[a-z0-9]{8,}$/i.test(localName)) {
+    if (
+      !STATE.enabled ||
+      !DIRECT_IMGUR_IMAGE_MATCH.test(activeUrl) ||
+      !/^BlobioCustomSkin_[a-z0-9]{8,}$/i.test(localName) ||
+      !baseSkin ||
+      !/^[a-z0-9_.-]+$/i.test(baseSkin.name) ||
+      !CUSTOM_SKIN_TYPES.includes(baseSkin.type)
+    ) {
       return null;
     }
 
-    return { activeUrl, localName };
+    return { activeUrl, localName, baseSkin };
   }
 
   function decodeBase64UrlJson(value) {
@@ -247,6 +300,7 @@
     return {
       activeUrl: state.activeUrl,
       localName: state.localName,
+      baseSkin: state.baseSkin,
       userId: getAccessTokenUserId(),
       playerName: getLocalValue('config-' + 'username') || '',
     };
@@ -270,7 +324,7 @@
 
   window.__blobioCustomSkinPatchUsable = function customSkinPatchUsable(_items, skinName, currentResult) {
     const state = getState();
-    return Boolean(currentResult || (state && skinName === state.localName));
+    return Boolean(currentResult || (state && (skinName === state.localName || skinName === state.baseSkin.name)));
   };
 
   function syncConfig() {
@@ -282,9 +336,10 @@
     setLocalValue(CUSTOM_SKIN_ENABLED_KEY, '1');
     setLocalValue(CUSTOM_SKIN_ACTIVE_KEY, state.activeUrl);
     setLocalValue(CUSTOM_SKIN_LOCAL_NAME_KEY, state.localName);
-    setLocalValue('config-skin', state.localName);
-    setLocalValue('config-skin-type', CUSTOM_SKIN_TYPE);
-    debug('Custom skin config synced before GWT startup.', state.localName);
+    setLocalValue(CUSTOM_SKIN_BASE_KEY, JSON.stringify(state.baseSkin));
+    setLocalValue('config-skin', state.baseSkin.name);
+    setLocalValue('config-skin-type', state.baseSkin.type);
+    debug('Custom skin config synced before GWT startup.', state.baseSkin.name);
   }
 
   function getUrlPath(url) {
@@ -310,9 +365,16 @@
       return originalUrl;
     }
 
+    const path = getUrlPath(originalUrl);
+    const escapedBaseName = state.baseSkin.name.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&');
+    const baseSkinPath = new RegExp('/skins/' + state.baseSkin.type + '/' + escapedBaseName + '\\\\.png$', 'i');
+    if (baseSkinPath.test(path)) {
+      return state.activeUrl;
+    }
+
     const escapedName = state.localName.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&');
     const skinPath = new RegExp('/skins/(?:' + CUSTOM_SKIN_TYPES.join('|') + ')/' + escapedName + '\\\\.png$', 'i');
-    return skinPath.test(getUrlPath(originalUrl)) ? state.activeUrl : originalUrl;
+    return skinPath.test(path) ? state.activeUrl : originalUrl;
   }
 
   function patchAssetManifestText(text) {
@@ -375,7 +437,7 @@
     if (constructorPattern.test(patched)) {
       patched = patched.replace(
         constructorPattern,
-        "function $1(a,b,c,d,e,f,g,h,i,j){var k,l,m,n,o,p;$2try{var _blobioState=$wnd.__blobioCustomSkinRuntimeState&&$wnd.__blobioCustomSkinRuntimeState();var __blobioForceSkin=!!(_blobioState&&$wnd.__blobioCustomSkinIsLocalCell&&$wnd.__blobioCustomSkinIsLocalCell(this));var __blobioCustomSkinForceLocal=__blobioForceSkin;if(__blobioForceSkin){i=_blobioState.localName;this.L=i}}catch(_blobioError){}",
+        "function $1(a,b,c,d,e,f,g,h,i,j){var k,l,m,n,o,p;$2try{var _blobioState=$wnd.__blobioCustomSkinRuntimeState&&$wnd.__blobioCustomSkinRuntimeState();var __blobioForceSkin=!!(_blobioState&&$wnd.__blobioCustomSkinIsLocalCell&&$wnd.__blobioCustomSkinIsLocalCell(this));var __blobioCustomSkinForceLocal=__blobioForceSkin;if(__blobioForceSkin){i=_blobioState.baseSkin.name||_blobioState.localName;this.L=i}}catch(_blobioError){}",
       );
       changed = true;
       debug('Patched GWT cell constructor for local custom skin.', state.localName);
@@ -636,7 +698,7 @@
       (document.documentElement || document.head).appendChild(script);
       script.remove();
     } catch (error) {
-      logError('Failed to inject Custom Imgur Skin page bootstrap.', error);
+      logError('Failed to inject Custom Skin page bootstrap.', error);
     }
   }
 
@@ -659,14 +721,17 @@
     }
 
     const localName = getSharedValue(CUSTOM_SKIN_LOCAL_NAME_KEY) || '';
+    const baseSkin = getCustomSkinBaseSkin();
     const state = getCustomSkinState();
     if (state) {
-      setLocalValue('config-skin', state.localName);
-      setLocalValue('config-skin-type', CUSTOM_SKIN_TYPE);
+      setLocalValue(CUSTOM_SKIN_BASE_KEY, JSON.stringify(state.baseSkin));
+      setLocalValue('config-skin', state.baseSkin.name);
+      setLocalValue('config-skin-type', state.baseSkin.type);
       return;
     }
 
-    if (localName && getLocalValue('config-skin') === localName) {
+    const currentSkin = getLocalValue('config-skin') || '';
+    if ((localName && currentSkin === localName) || (baseSkin?.name && currentSkin === baseSkin.name)) {
       const previous = getPreviousSkin();
       if (previous?.name) {
         setLocalValue('config-skin', previous.name);
@@ -697,9 +762,16 @@
       return originalUrl;
     }
 
+    const path = getUrlPath(originalUrl);
+    const escapedBaseName = state.baseSkin.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const baseSkinPath = new RegExp(`/skins/${state.baseSkin.type}/${escapedBaseName}\\.png$`, 'i');
+    if (baseSkinPath.test(path)) {
+      return state.activeUrl;
+    }
+
     const escapedName = state.localName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const skinPath = new RegExp(`/skins/(?:${CUSTOM_SKIN_TYPES.join('|')})/${escapedName}\\.png$`, 'i');
-    return skinPath.test(getUrlPath(originalUrl)) ? state.activeUrl : originalUrl;
+    return skinPath.test(path) ? state.activeUrl : originalUrl;
   }
 
   function patchAssetManifestText(text) {

@@ -4,7 +4,7 @@ import { createBlobioStorage } from '../storage/BlobioStorage.js';
 const DEFAULT_CLASS_NAME = 'blobio-menu-enabled';
 const DEFAULT_STYLE_ID = 'blobio-menu-style';
 const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
-const DEFAULT_EXTENSION_VERSION = '0.1.21';
+const DEFAULT_EXTENSION_VERSION = '0.1.22';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -18,13 +18,20 @@ const CUSTOM_SKIN_GALLERY_KEY = 'blobio.customSkin.gallery';
 const CUSTOM_SKIN_ACTIVE_KEY = 'blobio.customSkin.activeUrl';
 const CUSTOM_SKIN_PREVIOUS_KEY = 'blobio.customSkin.previousSkin';
 const CUSTOM_SKIN_LOCAL_NAME_KEY = 'blobio.customSkin.localName';
+const CUSTOM_SKIN_BASE_KEY = 'blobio.customSkin.baseSkin';
 const CUSTOM_SKIN_DEFAULT_URL = 'https://i.imgur.com/OZz80VZ.jpeg';
 const CUSTOM_SKIN_NAME = 'BlobioCustomSkin';
 const CUSTOM_SKIN_TYPE = 'free';
 const CUSTOM_SKIN_TYPES = ['free', 'premium'];
 const DIRECT_IMGUR_IMAGE_MATCH = /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i;
 const CUSTOM_SKIN_NOTICE_DURATION = 2200;
+const CUSTOM_SKIN_OWNED_NOTICE = "For custom skins you need to own at least 1 in-game skin. If you already own one and it doesn't show up reload the page.";
 const MAIN_MENU_ALIGNMENT_CLASS = 'blobio-main-menu-align-target';
+
+const EXTENSION_OPTION_TOOLTIPS = {
+  watermark: 'This option will display the Extension name text, alongside its current version.',
+  customSkin: 'This option lets you apply one of your saved direct i.imgur.com images as your local skin. Requires login and at least one owned skin.',
+};
 
 const DEFAULT_VIDEO = {
   title: 'Featured Blob.io Video',
@@ -130,6 +137,7 @@ export class MenuFeature {
     this.customSkinListeners = [];
     this.customSkinSelectedUrl = null;
     this.customSkinNoticeTimer = null;
+    this.extensionTooltip = null;
     this.documentClickHandler = null;
     this.keydownHandler = null;
   }
@@ -157,6 +165,7 @@ export class MenuFeature {
     this.installToolbar();
     this.hideOriginalSections();
     this.installPolicyDock();
+    this.syncCustomSkinAvailability();
     this.installExtensionSettings();
     this.installCustomSkinUi();
     this.syncWatermark();
@@ -331,6 +340,7 @@ export class MenuFeature {
       this.installToolbar();
       this.hideOriginalSections();
       this.installPolicyDock();
+      this.syncCustomSkinAvailability();
       this.installExtensionSettings();
       this.installCustomSkinUi();
       this.syncWatermark();
@@ -827,6 +837,7 @@ export class MenuFeature {
       this.createExtensionSwitchRow({
         id: 'config-switch-watermark',
         label: 'WaterMark',
+        description: EXTENSION_OPTION_TOOLTIPS.watermark,
         checked: this.isWatermarkEnabled(),
         onChange: (enabled) => {
           this.setWatermarkEnabled(enabled);
@@ -835,10 +846,12 @@ export class MenuFeature {
       }),
       this.createExtensionSwitchRow({
         id: 'config-switch-custom-imgur-skin',
-        label: 'Custom Imgur Skin',
+        label: 'Custom Skin',
+        description: EXTENSION_OPTION_TOOLTIPS.customSkin,
         checked: this.isCustomSkinEnabled(),
-        onChange: (enabled) => {
-          this.setCustomSkinEnabled(enabled);
+        onChange: (enabled, checkbox) => {
+          const saved = this.setCustomSkinEnabled(enabled);
+          checkbox.checked = saved;
           this.installCustomSkinUi();
         },
       }),
@@ -847,10 +860,13 @@ export class MenuFeature {
     return panel;
   }
 
-  createExtensionSwitchRow({ id, label, checked, onChange }) {
+  createExtensionSwitchRow({ id, label, description, checked, onChange }) {
     const row = this.document.createElement('div');
     row.classList.add('grid-item', 'blobio-extension-setting-row');
     row.setAttribute('_ngcontent-c3', '');
+    if (description) {
+      row.dataset.blobioTooltip = description;
+    }
 
     const switchLabel = this.document.createElement('label');
     switchLabel.classList.add('switch');
@@ -877,8 +893,14 @@ export class MenuFeature {
     row.append(switchLabel, textLabel);
 
     this.addSettingsListener(checkbox, 'change', () => {
-      onChange(Boolean(checkbox.checked));
+      onChange(Boolean(checkbox.checked), checkbox);
     });
+
+    if (description) {
+      this.addSettingsListener(row, 'mouseenter', (event) => this.showExtensionTooltip(row, event));
+      this.addSettingsListener(row, 'mousemove', (event) => this.moveExtensionTooltip(event));
+      this.addSettingsListener(row, 'mouseleave', () => this.hideExtensionTooltip());
+    }
 
     return row;
   }
@@ -932,7 +954,38 @@ export class MenuFeature {
       node.remove();
     }
 
+    this.hideExtensionTooltip();
     this.removeWatermarks();
+  }
+
+  showExtensionTooltip(row, event) {
+    const text = row?.dataset?.blobioTooltip || '';
+    if (!text) {
+      return;
+    }
+
+    if (!this.extensionTooltip) {
+      this.extensionTooltip = this.document.createElement('div');
+      this.extensionTooltip.classList.add('blobio-extension-tooltip');
+      this.document.body?.appendChild(this.extensionTooltip);
+    }
+
+    this.extensionTooltip.textContent = text;
+    this.moveExtensionTooltip(event);
+  }
+
+  moveExtensionTooltip(event) {
+    if (!this.extensionTooltip || !event) {
+      return;
+    }
+
+    this.extensionTooltip.style.left = `${Number(event.clientX || 0) + 14}px`;
+    this.extensionTooltip.style.top = `${Number(event.clientY || 0) + 14}px`;
+  }
+
+  hideExtensionTooltip() {
+    this.extensionTooltip?.remove();
+    this.extensionTooltip = null;
   }
 
   isWatermarkEnabled() {
@@ -957,20 +1010,38 @@ export class MenuFeature {
     try {
       return this.storage?.getItem?.(CUSTOM_SKIN_ENABLED_KEY) === '1';
     } catch (error) {
-      this.logger.warn('[Blobio] Could not read Custom Imgur Skin setting.', error);
+      this.logger.warn('[Blobio] Could not read Custom Skin setting.', error);
       return false;
     }
   }
 
-  setCustomSkinEnabled(enabled) {
+  isLoggedInForCustomSkin() {
     try {
-      this.storage?.setItem?.(CUSTOM_SKIN_ENABLED_KEY, enabled ? '1' : '0');
-      if (!enabled) {
+      return Boolean(this.storage?.getItem?.('access-token'));
+    } catch {
+      return false;
+    }
+  }
+
+  syncCustomSkinAvailability() {
+    if (this.isCustomSkinEnabled() && !this.isLoggedInForCustomSkin()) {
+      this.setCustomSkinEnabled(false);
+    }
+  }
+
+  setCustomSkinEnabled(enabled) {
+    const nextEnabled = Boolean(enabled && this.isLoggedInForCustomSkin());
+
+    try {
+      this.storage?.setItem?.(CUSTOM_SKIN_ENABLED_KEY, nextEnabled ? '1' : '0');
+      if (!nextEnabled) {
         this.clearCustomSkinUse();
       }
     } catch (error) {
-      this.logger.warn('[Blobio] Could not save Custom Imgur Skin setting.', error);
+      this.logger.warn('[Blobio] Could not save Custom Skin setting.', error);
     }
+
+    return nextEnabled;
   }
 
   getCustomSkinGallery() {
@@ -987,7 +1058,7 @@ export class MenuFeature {
 
       return this.uniqueValidImgurUrls(parsed);
     } catch (error) {
-      this.logger.warn('[Blobio] Could not read Custom Imgur Skin gallery.', error);
+      this.logger.warn('[Blobio] Could not read Custom Skin gallery.', error);
       return [CUSTOM_SKIN_DEFAULT_URL];
     }
   }
@@ -996,7 +1067,7 @@ export class MenuFeature {
     try {
       this.storage?.setItem?.(CUSTOM_SKIN_GALLERY_KEY, JSON.stringify(this.uniqueValidImgurUrls(urls)));
     } catch (error) {
-      this.logger.warn('[Blobio] Could not save Custom Imgur Skin gallery.', error);
+      this.logger.warn('[Blobio] Could not save Custom Skin gallery.', error);
     }
   }
 
@@ -1050,9 +1121,112 @@ export class MenuFeature {
       const url = this.storage?.getItem?.(CUSTOM_SKIN_ACTIVE_KEY) || '';
       return this.isValidImgurSkinUrl(url) ? url : '';
     } catch (error) {
-      this.logger.warn('[Blobio] Could not read active Custom Imgur Skin.', error);
+      this.logger.warn('[Blobio] Could not read active Custom Skin.', error);
       return '';
     }
+  }
+
+  getCustomSkinBaseConfig() {
+    try {
+      const raw = this.storage?.getItem?.(CUSTOM_SKIN_BASE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return this.isValidSkinConfig(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  saveCustomSkinBaseConfig(config) {
+    if (!this.isValidSkinConfig(config)) {
+      return false;
+    }
+
+    this.storage?.setItem?.(CUSTOM_SKIN_BASE_KEY, JSON.stringify(config));
+    return true;
+  }
+
+  clearCustomSkinBaseConfig() {
+    this.storage?.removeItem?.(CUSTOM_SKIN_BASE_KEY);
+  }
+
+  isValidSkinConfig(config) {
+    return Boolean(
+      config &&
+      typeof config.name === 'string' &&
+      /^[a-z0-9_.-]+$/i.test(config.name) &&
+      typeof config.type === 'string' &&
+      CUSTOM_SKIN_TYPES.includes(config.type),
+    );
+  }
+
+  parseSkinConfigFromUrl(url) {
+    const path = this.getUrlPath(url);
+    const match = path.match(/\/skins\/(free|premium)\/([^/?#]+)\.png$/i);
+    if (!match) {
+      return null;
+    }
+
+    const config = {
+      type: match[1].toLowerCase(),
+      name: decodeURIComponent(match[2]),
+    };
+
+    return this.isValidSkinConfig(config) ? config : null;
+  }
+
+  getCurrentSkinConfig() {
+    const name = this.storage?.getItem?.('config-skin') || '';
+    const type = this.storage?.getItem?.('config-skin-type') || CUSTOM_SKIN_TYPE;
+    const config = { name, type };
+    return this.isValidSkinConfig(config) ? config : null;
+  }
+
+  uniqueSkinOptions(options) {
+    const valid = [];
+    const seen = new Set();
+
+    for (const option of options) {
+      if (!this.isValidSkinConfig(option)) {
+        continue;
+      }
+
+      const key = `${option.type}:${option.name}`;
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      valid.push(option);
+    }
+
+    return valid;
+  }
+
+  getOwnedSkinOptions(skinsRoot = null) {
+    const root = skinsRoot || this.document;
+    const containers = [];
+
+    for (const container of root.querySelectorAll?.('.skins-container') || []) {
+      if (container.classList?.contains('owned') || container.dataset?.blobioSkinCategory === 'owned') {
+        containers.push(container);
+      }
+    }
+
+    const options = [];
+    for (const container of containers) {
+      for (const image of container.querySelectorAll?.('img') || []) {
+        const config = this.parseSkinConfigFromUrl(image.getAttribute?.('src') || image.src || '');
+        if (config) {
+          options.push(config);
+        }
+      }
+    }
+
+    return this.uniqueSkinOptions(options);
+  }
+
+  chooseOwnedSkinForCustomSkin() {
+    return this.getOwnedSkinOptions()[0] || null;
   }
 
   getStoredCustomSkinLocalName() {
@@ -1076,7 +1250,7 @@ export class MenuFeature {
       this.storage?.setItem?.(CUSTOM_SKIN_LOCAL_NAME_KEY, localName);
       return localName;
     } catch (error) {
-      this.logger.warn('[Blobio] Could not create local Custom Imgur Skin name.', error);
+      this.logger.warn('[Blobio] Could not create local Custom Skin name.', error);
       return `${CUSTOM_SKIN_NAME}_localonly`;
     }
   }
@@ -1089,15 +1263,18 @@ export class MenuFeature {
 
     try {
       const activeUrl = this.getActiveCustomSkinUrl();
-      const localSkinName = activeUrl && this.isCustomSkinEnabled() ? this.getCustomSkinLocalName() : this.getStoredCustomSkinLocalName();
+      const baseSkin = this.getCustomSkinBaseConfig();
+      const localSkinName = this.getStoredCustomSkinLocalName();
 
-      if (activeUrl && localSkinName && this.isCustomSkinEnabled()) {
-        this.storage?.setItem?.('config-skin', localSkinName);
-        this.storage?.setItem?.('config-skin-type', CUSTOM_SKIN_TYPE);
+      if (activeUrl && baseSkin && this.isCustomSkinEnabled()) {
+        this.storage?.setItem?.('config-skin', baseSkin.name);
+        this.storage?.setItem?.('config-skin-type', baseSkin.type);
         return;
       }
 
-      if (localSkinName && this.storage?.getItem?.('config-skin') === localSkinName) {
+      const currentSkin = this.storage?.getItem?.('config-skin') || '';
+      const shouldRestore = (baseSkin?.name && currentSkin === baseSkin.name) || (localSkinName && currentSkin === localSkinName);
+      if (shouldRestore) {
         const previous = this.getPreviousSkinConfig();
         if (previous?.name) {
           this.storage?.setItem?.('config-skin', previous.name);
@@ -1108,44 +1285,54 @@ export class MenuFeature {
         }
       }
     } catch (error) {
-      this.logger.warn('[Blobio] Could not sync Custom Imgur Skin for the game client.', error);
+      this.logger.warn('[Blobio] Could not sync Custom Skin for the game client.', error);
     }
   }
 
   useCustomSkinUrl(url) {
     if (!this.isValidImgurSkinUrl(url)) {
-      return false;
+      return { ok: false, reason: 'invalid-url' };
+    }
+
+    if (!this.isLoggedInForCustomSkin()) {
+      this.setCustomSkinEnabled(false);
+      return { ok: false, reason: 'logged-out' };
     }
 
     try {
-      const localSkinName = this.getCustomSkinLocalName();
-      const currentSkin = this.storage?.getItem?.('config-skin') || '';
-      const currentType = this.storage?.getItem?.('config-skin-type') || '';
+      const baseSkin = this.chooseOwnedSkinForCustomSkin();
+      if (!baseSkin) {
+        return { ok: false, reason: 'missing-owned-skin' };
+      }
 
-      if (currentSkin !== localSkinName) {
-        this.storage?.setItem?.(CUSTOM_SKIN_PREVIOUS_KEY, JSON.stringify({ name: currentSkin, type: currentType || CUSTOM_SKIN_TYPE }));
+      const current = this.getCurrentSkinConfig();
+      if (!current || current.name !== baseSkin.name || current.type !== baseSkin.type) {
+        this.storage?.setItem?.(CUSTOM_SKIN_PREVIOUS_KEY, JSON.stringify(current || { name: '', type: CUSTOM_SKIN_TYPE }));
       }
 
       this.storage?.setItem?.(CUSTOM_SKIN_ENABLED_KEY, '1');
       this.storage?.setItem?.(CUSTOM_SKIN_ACTIVE_KEY, url);
-      this.storage?.setItem?.('config-skin', localSkinName);
-      this.storage?.setItem?.('config-skin-type', CUSTOM_SKIN_TYPE);
+      this.saveCustomSkinBaseConfig(baseSkin);
+      this.storage?.setItem?.('config-skin', baseSkin.name);
+      this.storage?.setItem?.('config-skin-type', baseSkin.type);
       this.updateChooseSkinPreview(url);
-      return true;
+      return { ok: true, baseSkin };
     } catch (error) {
-      this.logger.warn('[Blobio] Could not apply Custom Imgur Skin.', error);
-      return false;
+      this.logger.warn('[Blobio] Could not apply Custom Skin.', error);
+      return { ok: false, reason: 'storage-error' };
     }
   }
 
   clearCustomSkinUse() {
     try {
-      const localSkinName = this.getCustomSkinLocalName();
+      const localSkinName = this.getStoredCustomSkinLocalName();
+      const baseSkin = this.getCustomSkinBaseConfig();
       const currentSkin = this.storage?.getItem?.('config-skin') || '';
       const previous = this.getPreviousSkinConfig();
       this.storage?.removeItem?.(CUSTOM_SKIN_ACTIVE_KEY);
+      this.clearCustomSkinBaseConfig();
 
-      if (currentSkin === localSkinName) {
+      if ((baseSkin?.name && currentSkin === baseSkin.name) || (localSkinName && currentSkin === localSkinName)) {
         if (previous?.name) {
           this.storage?.setItem?.('config-skin', previous.name);
           this.storage?.setItem?.('config-skin-type', previous.type || CUSTOM_SKIN_TYPE);
@@ -1156,7 +1343,7 @@ export class MenuFeature {
         }
       }
     } catch (error) {
-      this.logger.warn('[Blobio] Could not clear Custom Imgur Skin.', error);
+      this.logger.warn('[Blobio] Could not clear Custom Skin.', error);
     }
   }
 
@@ -1313,9 +1500,14 @@ export class MenuFeature {
     this.addCustomSkinListener(useButton, 'click', (event) => {
       event.stopPropagation?.();
       const url = panel.dataset.selectedSkinUrl || '';
-      if (this.useCustomSkinUrl(url)) {
+      const result = this.useCustomSkinUrl(url);
+      if (result.ok) {
         this.renderCustomSkinGallery(panel);
         this.showCustomSkinNotice(panel, 'Skin is now applied', 'success');
+      } else if (result.reason === 'missing-owned-skin') {
+        this.showCustomSkinNotice(panel, CUSTOM_SKIN_OWNED_NOTICE, 'error');
+      } else if (result.reason === 'logged-out') {
+        this.showCustomSkinNotice(panel, 'Log in to use Custom Skin.', 'error');
       }
     });
 
@@ -1669,10 +1861,22 @@ export class MenuFeature {
       return originalUrl;
     }
 
-    const localSkinName = this.getCustomSkinLocalName();
+    const baseSkin = this.getCustomSkinBaseConfig();
+    if (baseSkin) {
+      const escapedBaseName = baseSkin.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const baseSkinPath = new RegExp(`/skins/${baseSkin.type}/${escapedBaseName}\\.png$`, 'i');
+      if (baseSkinPath.test(this.getUrlPath(originalUrl))) {
+        return activeUrl;
+      }
+    }
+
+    const localSkinName = this.getStoredCustomSkinLocalName();
+    if (!localSkinName) {
+      return originalUrl;
+    }
+
     const escapedName = localSkinName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const customSkinPath = new RegExp(`/skins/(?:${CUSTOM_SKIN_TYPES.join('|')})/${escapedName}\\.png$`, 'i');
-
     if (customSkinPath.test(this.getUrlPath(originalUrl))) {
       return activeUrl;
     }

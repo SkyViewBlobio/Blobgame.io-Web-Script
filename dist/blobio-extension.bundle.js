@@ -4008,7 +4008,7 @@ html.${className} .blobio-watermark-extension::after {
       script.dataset.blobioCustomSkinOverlayRefresh = "true";
       script.textContent = `;(() => {
   const state = ${JSON.stringify(nextState)};
-  window.__blobioCustomSkinOverlayV12?.refresh?.(state);
+  window.__blobioCustomSkinOverlayV13?.refresh?.(state);
 })();`;
       (this.document.documentElement || this.document.head || this.document.body)?.appendChild?.(script);
       script.remove();
@@ -4188,8 +4188,8 @@ html.${className} .blobio-watermark-extension::after {
     const SIBLING_MIN_OBSERVATIONS = 3;
     const SIBLING_MAX_AGE_MS = 1400;
     const SIBLING_MAX_DISTANCE_FACTOR = 34;
-    if (window.__blobioCustomSkinOverlayV12) {
-      window.__blobioCustomSkinOverlayV12.refresh?.(initialState);
+    if (window.__blobioCustomSkinOverlayV13) {
+      window.__blobioCustomSkinOverlayV13.refresh?.(initialState);
       return;
     }
     const state = {
@@ -4217,6 +4217,8 @@ html.${className} .blobio-watermark-extension::after {
       shortOwnFallbackUpdates: 0,
       updatePackets: 0,
       updateParseErrors: 0,
+      updateNodeSamples: [],
+      updateNodeParseSummaries: [],
       opCounts: {},
       earlyPackets: [],
       ownNodeMissFrames: 0,
@@ -4800,8 +4802,8 @@ html.${className} .blobio-watermark-extension::after {
     function installCanvasCircleTracker() {
       if (state.canvasHooked) return;
       const proto = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
-      if (!proto || proto.__blobioSkinCircleTrackerV12) return;
-      proto.__blobioSkinCircleTrackerV12 = true;
+      if (!proto || proto.__blobioSkinCircleTrackerV13) return;
+      proto.__blobioSkinCircleTrackerV13 = true;
       state.canvasHooked = true;
       const originalArc = proto.arc;
       const originalFill = proto.fill;
@@ -5375,9 +5377,12 @@ html.${className} .blobio-watermark-extension::after {
         applyDecodedIds(candidate.records);
       }
       const parsed = candidates.sort((a, b) => scoreParse(b) - scoreParse(a))[0];
+      const sample = buildUpdateNodeSample(packet, meta, candidates, parsed);
+      rememberUpdateNodeSample(sample);
       if (!parsed) {
         state.updateParseErrors += 1;
-        if (state.debug) log("update packet parse failed", { length: packet.length, meta }, "packet-error");
+        if (sample) sample.failed = true;
+        if (state.debug) log("update packet parse failed", { length: packet.length, meta, sample }, "packet-error");
         return;
       }
       applyUpdateParse(parsed);
@@ -5391,6 +5396,200 @@ html.${className} .blobio-watermark-extension::after {
         shortOwnUpdates,
         length: packet.length
       };
+      if (sample) {
+        sample.applied = {
+          shortOwnUpdates,
+          ownIdsAfter: Array.from(state.ownIds),
+          siblingOwnIdsAfter: Array.from(state.siblingOwnIds),
+          ownRenderNodeIdsAfter: state.ownRenderNodes.map((node) => node.id),
+          lastPacketSummary: state.lastPacketSummary
+        };
+      }
+    }
+    function buildUpdateNodeSample(packet, meta, candidates, parsed) {
+      if (!packet || packet.length < 1) return null;
+      const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
+      const bytes = Array.from(packet.slice(0, Math.min(packet.length, 192)));
+      const first64 = Array.from(packet.slice(0, Math.min(packet.length, 64)));
+      const hexFirst64 = first64.map((byte) => byte.toString(16).padStart(2, "0")).join(" ");
+      const knownOwnIds = Array.from(state.ownIds).map((id) => id >>> 0);
+      const knownSiblingIds = Array.from(state.siblingOwnIds).map((id) => id >>> 0);
+      const ownNodes = knownOwnIds.map((id) => state.nodes.get(id)).filter(Boolean);
+      const safeUint16 = (offset) => offset + 2 <= packet.length ? view.getUint16(offset, true) >>> 0 : null;
+      const safeUint32 = (offset) => offset + 4 <= packet.length ? view.getUint32(offset, true) >>> 0 : null;
+      const idOffsetHits = [];
+      for (let offset = 1; offset < packet.length - 1; offset += 1) {
+        const u16 = safeUint16(offset);
+        const u32 = safeUint32(offset);
+        const hit = { offset };
+        let matched = false;
+        if (knownOwnIds.includes(u16)) {
+          hit.u16 = u16;
+          hit.match = "own-u16";
+          matched = true;
+        }
+        if (knownOwnIds.includes(u32)) {
+          hit.u32 = u32;
+          hit.match = hit.match ? `${hit.match}+own-u32` : "own-u32";
+          matched = true;
+        }
+        if (knownSiblingIds.includes(u16)) {
+          hit.u16 = u16;
+          hit.match = hit.match ? `${hit.match}+sibling-u16` : "sibling-u16";
+          matched = true;
+        }
+        if (knownSiblingIds.includes(u32)) {
+          hit.u32 = u32;
+          hit.match = hit.match ? `${hit.match}+sibling-u32` : "sibling-u32";
+          matched = true;
+        }
+        if (matched) idOffsetHits.push(hit);
+        if (idOffsetHits.length >= 80) break;
+      }
+      const compactCandidates = candidates.map((candidate) => compactUpdateCandidate(candidate, knownOwnIds, ownNodes));
+      const chosen = parsed ? compactUpdateCandidate(parsed, knownOwnIds, ownNodes) : null;
+      const chosenNearOwn = chosen ? chosen.interestingRecords : [];
+      const rawShortCandidate = candidates.find((candidate) => candidate.protocol === "short");
+      return {
+        t: (/* @__PURE__ */ new Date()).toISOString(),
+        opcode: 16,
+        length: packet.length,
+        bytes,
+        bytesTruncated: packet.length > bytes.length,
+        first64,
+        hexFirst64,
+        meta: sanitize(meta),
+        knownOwnIds,
+        knownSiblingIds,
+        selectedProtocol: parsed ? parsed.protocol : null,
+        selectedScore: parsed ? scoreParse(parsed) : 0,
+        idOffsetHits,
+        candidates: compactCandidates,
+        chosen,
+        chosenNearOwn,
+        shortCandidateInterestingRecords: rawShortCandidate ? compactUpdateCandidate(rawShortCandidate, knownOwnIds, ownNodes).interestingRecords : []
+      };
+    }
+    function rememberUpdateNodeSample(sample) {
+      if (!sample) return;
+      const hasOwnSignal = Boolean(
+        sample.idOffsetHits.length || sample.chosenNearOwn.length || sample.shortCandidateInterestingRecords.length || sample.chosen && sample.chosen.ownRecords > 0
+      );
+      const shouldKeep = hasOwnSignal || state.updateNodeSamples.length < 12 || sample.length > 120;
+      if (!shouldKeep) return;
+      state.updateNodeSamples.push(sample);
+      while (state.updateNodeSamples.length > 80) state.updateNodeSamples.shift();
+      state.updateNodeParseSummaries.push({
+        t: sample.t,
+        length: sample.length,
+        selectedProtocol: sample.selectedProtocol,
+        selectedScore: sample.selectedScore,
+        knownOwnIds: sample.knownOwnIds,
+        knownSiblingIds: sample.knownSiblingIds,
+        idOffsetHitCount: sample.idOffsetHits.length,
+        chosenNearOwnCount: sample.chosenNearOwn.length,
+        shortInterestingCount: sample.shortCandidateInterestingRecords.length,
+        candidateSummaries: sample.candidates.map((candidate) => ({
+          protocol: candidate.protocol,
+          score: candidate.score,
+          records: candidate.records,
+          removed: candidate.removed,
+          ownRecords: candidate.ownRecords,
+          siblingRecords: candidate.siblingRecords,
+          interestingRecords: candidate.interestingRecords.length
+        }))
+      });
+      while (state.updateNodeParseSummaries.length > 120) state.updateNodeParseSummaries.shift();
+    }
+    function compactUpdateCandidate(candidate, knownOwnIds, ownNodes) {
+      const records = Array.isArray(candidate.records) ? candidate.records : [];
+      const removed = Array.isArray(candidate.removed) ? candidate.removed : [];
+      const ownSet = new Set(knownOwnIds || []);
+      const siblingSet = state.siblingOwnIds || /* @__PURE__ */ new Set();
+      const localName = getLocalPlayerName();
+      const interestingRecords = [];
+      for (const record of records) {
+        const id = record.id >>> 0;
+        const rawId = (record.rawId ?? record.id) >>> 0;
+        const normalizedName = normalizePlayerName(record.name || "");
+        const isOwn = ownSet.has(id) || ownSet.has(rawId);
+        const isSibling = siblingSet.has(id) || siblingSet.has(rawId);
+        const idDelta = nearestIdDelta(id, knownOwnIds);
+        const lowDelta = nearestIdDelta(id & 65535, (knownOwnIds || []).map((ownId) => ownId & 65535));
+        const nearbyOwn = nearestOwnNodeDistance(record, ownNodes || []);
+        const similarSize = nearbyOwn && nearbyOwn.sizeRatio >= 0.45 && nearbyOwn.sizeRatio <= 2.25 || false;
+        const nameMatch = Boolean(localName && normalizedName && normalizedName === localName);
+        const interesting = isOwn || isSibling || nameMatch || idDelta <= 32 || lowDelta <= 32 || nearbyOwn && nearbyOwn.distance <= Math.max(2200, (nearbyOwn.ownSize + record.size) * 18) && similarSize;
+        if (!interesting) continue;
+        interestingRecords.push({
+          id,
+          rawId,
+          x: record.x,
+          y: record.y,
+          size: record.size,
+          flags: record.flags || 0,
+          name: record.name || "",
+          skin: record.skin || "",
+          ownership: isOwn ? "known-own" : isSibling ? "known-sibling" : nameMatch ? "name-match" : "candidate",
+          idDelta: Number.isFinite(idDelta) ? idDelta : null,
+          lowDelta: Number.isFinite(lowDelta) ? lowDelta : null,
+          distanceToNearestOwn: nearbyOwn ? Math.round(nearbyOwn.distance) : null,
+          nearestOwnId: nearbyOwn ? nearbyOwn.ownId : null,
+          ownSize: nearbyOwn ? nearbyOwn.ownSize : null,
+          sizeRatio: nearbyOwn ? Number(nearbyOwn.sizeRatio.toFixed(3)) : null
+        });
+        if (interestingRecords.length >= 80) break;
+      }
+      return {
+        protocol: candidate.protocol,
+        score: scoreParse(candidate),
+        records: records.length,
+        removed: removed.length,
+        offset: candidate.offset,
+        length: candidate.length,
+        exactLength: candidate.offset === candidate.length,
+        ownRecords: records.filter((record) => ownSet.has(record.id >>> 0)).length,
+        siblingRecords: records.filter((record) => siblingSet.has(record.id >>> 0)).length,
+        nameMatches: records.filter((record) => localName && normalizePlayerName(record.name || "") === localName).length,
+        removedNearOwn: removed.filter((id) => nearestIdDelta(id >>> 0, knownOwnIds) <= 32).slice(0, 40),
+        interestingRecords,
+        sampleRecords: records.slice(0, 14).map((record) => ({
+          id: record.id >>> 0,
+          rawId: (record.rawId ?? record.id) >>> 0,
+          x: record.x,
+          y: record.y,
+          size: record.size,
+          flags: record.flags || 0,
+          name: record.name || "",
+          skin: record.skin || ""
+        }))
+      };
+    }
+    function nearestIdDelta(id, ids) {
+      if (!ids || !ids.length) return Infinity;
+      let best = Infinity;
+      for (const item of ids) {
+        const delta = Math.abs((id >>> 0) - (item >>> 0));
+        if (delta < best) best = delta;
+      }
+      return best;
+    }
+    function nearestOwnNodeDistance(record, ownNodes) {
+      if (!record || !ownNodes || !ownNodes.length) return null;
+      let best = null;
+      for (const node of ownNodes) {
+        if (!node || !Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
+        const dx = (record.x || 0) - node.x;
+        const dy = (record.y || 0) - node.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const ownSize = Number(node.size) || 0;
+        const size = Number(record.size) || 0;
+        const sizeRatio = ownSize > 0 && size > 0 ? size / ownSize : 0;
+        if (!best || distance < best.distance) {
+          best = { distance, ownId: node.id, ownSize, sizeRatio };
+        }
+      }
+      return best;
     }
     function scoreParse(parsed) {
       let score = parsed.records.length * 2 + parsed.removed.length;
@@ -5743,7 +5942,7 @@ html.${className} .blobio-watermark-extension::after {
     function downloadDebugDump() {
       const dump = {
         meta: {
-          version: "packet-overlay-v12",
+          version: "packet-overlay-v13",
           createdAt: (/* @__PURE__ */ new Date()).toISOString(),
           href: location.href
         },
@@ -5782,6 +5981,8 @@ html.${className} .blobio-watermark-extension::after {
           ownListPackets: state.ownListPackets,
           ownListParsedPackets: state.ownListParsedPackets,
           ownListPacketSamples: state.ownListPacketSamples.slice(-20),
+          updateNodeSamples: state.updateNodeSamples.slice(-30),
+          updateNodeParseSummaries: state.updateNodeParseSummaries.slice(-80),
           shortOwnFallbackUpdates: state.shortOwnFallbackUpdates,
           updatePackets: state.updatePackets,
           updateParseErrors: state.updateParseErrors,
@@ -5809,7 +6010,7 @@ html.${className} .blobio-watermark-extension::after {
         a.remove();
       }, 1e3);
     }
-    window.__blobioCustomSkinOverlayV12 = {
+    window.__blobioCustomSkinOverlayV13 = {
       state,
       refresh,
       dump: () => ({
@@ -5837,6 +6038,8 @@ html.${className} .blobio-watermark-extension::after {
         ownListPackets: state.ownListPackets,
         ownListParsedPackets: state.ownListParsedPackets,
         ownListPacketSamples: state.ownListPacketSamples.slice(-10),
+        updateNodeSamples: state.updateNodeSamples.slice(-10),
+        updateNodeParseSummaries: state.updateNodeParseSummaries.slice(-20),
         shortOwnFallbackUpdates: state.shortOwnFallbackUpdates,
         opCounts: state.opCounts,
         earlyPackets: state.earlyPackets,

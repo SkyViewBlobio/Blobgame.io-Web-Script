@@ -194,15 +194,15 @@ html.${this.className} body::before {
 
 .blobio-vip-plus-time {
   position: absolute;
-  left: 50%;
-  top: 79%;
+  left: 52%;
+  top: 69%;
   display: inline-flex;
   align-items: flex-end;
   justify-content: center;
   max-width: 96%;
   transform: translate(-50%, -50%) rotate(-7deg);
   color: #f4fff6;
-  font-size: clamp(9px, calc(var(--blobio-vip-plus-size, 106px) * 0.09), 18px);
+  font-size: clamp(9px, calc(var(--blobio-vip-plus-size, 196px) * 0.09), 18px);
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -2145,7 +2145,7 @@ html.${className} .blobio-watermark-extension::after {
   var DEFAULT_CLASS_NAME2 = "blobio-menu-enabled";
   var DEFAULT_STYLE_ID2 = "blobio-menu-style";
   var DEFAULT_TOOLBAR_CLASS = "blobio-menu-toolbar";
-  var DEFAULT_EXTENSION_VERSION = "0.1.53";
+  var DEFAULT_EXTENSION_VERSION = "0.1.54";
   var HIDDEN_CLASS = "blobio-original-hidden";
   var PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
   var FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;

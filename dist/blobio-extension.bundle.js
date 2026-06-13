@@ -1302,7 +1302,7 @@ html.${className} .blobio-watermark-extension::after {
   var DEFAULT_CLASS_NAME2 = "blobio-menu-enabled";
   var DEFAULT_STYLE_ID2 = "blobio-menu-style";
   var DEFAULT_TOOLBAR_CLASS = "blobio-menu-toolbar";
-  var DEFAULT_EXTENSION_VERSION = "0.1.39";
+  var DEFAULT_EXTENSION_VERSION = "0.1.42";
   var HIDDEN_CLASS = "blobio-original-hidden";
   var PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
   var FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -1318,11 +1318,10 @@ html.${className} .blobio-watermark-extension::after {
   var CUSTOM_SKIN_CARRIER_ASSET_KEY = "blobio.customSkin.carrierAsset";
   var CUSTOM_SKIN_CARRIER_NAME_KEY = "blobio.customSkin.carrierName";
   var CUSTOM_SKIN_CARRIER_TYPE_KEY = "blobio.customSkin.carrierType";
-  var CUSTOM_SKIN_PREPARED_KEY = "blobio.customSkin.preparedDataUrl";
-  var CUSTOM_SKIN_PREPARED_SOURCE_KEY = "blobio.customSkin.preparedSource";
   var CUSTOM_SKIN_DEFAULT_URL = "https://i.imgur.com/OZz80VZ.jpeg";
   var DIRECT_IMGUR_IMAGE_MATCH = /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|webp)(?:\?.*)?$/i;
   var CUSTOM_SKIN_NOTICE_DURATION = 2200;
+  var CUSTOM_SKIN_RELOAD_SECONDS = 3;
   var MAIN_MENU_ALIGNMENT_CLASS = "blobio-main-menu-align-target";
   var MAIN_MENU_LAYERED_SELECT_CLASS = "blobio-menu-layered-select";
   var EXTENSION_OPTION_TOOLTIPS = {
@@ -2287,13 +2286,6 @@ html.${className} .blobio-watermark-extension::after {
       this.storage?.setItem?.(CUSTOM_SKIN_CARRIER_NAME_KEY, carrier.name);
       this.storage?.setItem?.(CUSTOM_SKIN_CARRIER_TYPE_KEY, carrier.type);
     }
-    async prepareCustomSkinAsset(url) {
-      const prepare = globalThis.__blobioPrepareCustomSkinAsset;
-      if (typeof prepare !== "function") {
-        return null;
-      }
-      return prepare(url);
-    }
     async useCustomSkinUrl(url, panel = null) {
       const cleanUrl = String(url || "").trim();
       if (!this.isValidImgurSkinUrl(cleanUrl)) {
@@ -2311,17 +2303,13 @@ html.${className} .blobio-watermark-extension::after {
         return { ok: false, reason: "no-owned-skins" };
       }
       try {
-        await this.prepareCustomSkinAsset(cleanUrl);
         this.saveCustomSkinUse(cleanUrl, carrier);
         this.updateChooseSkinPreview(cleanUrl);
         this.activateCustomSkinPanel(skins);
         return { ok: true, carrier };
       } catch (error) {
         this.logger.warn("[Blobio] Could not apply Custom Skin.", error);
-        return {
-          ok: false,
-          reason: /prepar|download|decode|loader/i.test(error?.message || "") ? "image-preparation-failed" : "storage-error"
-        };
+        return { ok: false, reason: "storage-error" };
       }
     }
     clearCustomSkinUse() {
@@ -2331,8 +2319,6 @@ html.${className} .blobio-watermark-extension::after {
         this.storage?.removeItem?.(CUSTOM_SKIN_CARRIER_ASSET_KEY);
         this.storage?.removeItem?.(CUSTOM_SKIN_CARRIER_NAME_KEY);
         this.storage?.removeItem?.(CUSTOM_SKIN_CARRIER_TYPE_KEY);
-        this.storage?.removeItem?.(CUSTOM_SKIN_PREPARED_KEY);
-        this.storage?.removeItem?.(CUSTOM_SKIN_PREPARED_SOURCE_KEY);
         if (carrier?.assetUrl) {
           this.updateChooseSkinPreview(carrier.assetUrl);
         }
@@ -2432,6 +2418,10 @@ html.${className} .blobio-watermark-extension::after {
       }
       const carrier = cards[Math.floor(randomValue * cards.length)] || cards[0];
       carrier.card.click?.();
+      await new Promise((resolve) => {
+        const setTimer = win.setTimeout || globalThis.setTimeout;
+        setTimer(resolve, 150);
+      });
       return carrier;
     }
     waitForOwnedSkinCards(skins, ownedTab, beforeUrls, timeoutMs = 1800) {
@@ -2580,7 +2570,7 @@ html.${className} .blobio-watermark-extension::after {
         const result = await this.useCustomSkinUrl(panel.dataset.selectedSkinUrl || "", panel);
         if (result.ok) {
           this.renderCustomSkinGallery(panel);
-          this.showCustomSkinNotice(panel, "Skin is now applied", "success");
+          this.startCustomSkinReloadCountdown(panel);
         } else {
           this.showCustomSkinUseError(panel, result.reason);
         }
@@ -2605,8 +2595,7 @@ html.${className} .blobio-watermark-extension::after {
         "logged-out": "Log in with Google or Facebook to use Custom Skin.",
         "no-owned-skins": "Own at least one skin in the Owned section to use Custom Skin.",
         "skins-unavailable": "Open the Skins menu and try again.",
-        "invalid-url": "Select a valid Custom Skin first.",
-        "image-preparation-failed": "The Custom Skin image could not be downloaded or processed. Check the image URL and try again."
+        "invalid-url": "Select a valid Custom Skin first."
       };
       this.showCustomSkinNotice(panel, messages[reason] || "Custom Skin could not be applied.", "error");
     }
@@ -2685,6 +2674,31 @@ html.${className} .blobio-watermark-extension::after {
       const active = this.getActiveCustomSkinUrl();
       const carrier = this.getCustomSkinCarrier();
       row.textContent = `Selected: ${selected || "none"} | Applied: ${active || "none"} | Carrier: ${carrier?.name || "none"}`;
+    }
+    startCustomSkinReloadCountdown(panel) {
+      const win = this.document.defaultView || globalThis;
+      let seconds = CUSTOM_SKIN_RELOAD_SECONDS;
+      this.clearCustomSkinNoticeTimer();
+      for (const oldNotice of this.document.querySelectorAll?.(".blobio-custom-skin-notice") || []) {
+        oldNotice.remove();
+      }
+      const notice = this.document.createElement("div");
+      notice.classList.add("blobio-custom-skin-notice", "is-floating", "is-success");
+      notice.setAttribute("aria-live", "assertive");
+      (this.document.body || panel)?.appendChild(notice);
+      const tick = () => {
+        notice.textContent = seconds > 0 ? `Custom Skin ready. Reloading in ${seconds}\u2026` : "Reloading\u2026";
+        if (seconds <= 0) {
+          this.customSkinNoticeTimer = null;
+          if (typeof win.location?.reload === "function") {
+            win.location.reload();
+          }
+          return;
+        }
+        seconds -= 1;
+        this.customSkinNoticeTimer = win.setTimeout?.(tick, 1e3) ?? globalThis.setTimeout(tick, 1e3);
+      };
+      tick();
     }
     showCustomSkinNotice(panel, message, type) {
       const skins = this.findAncestor(panel, "APP-SKINS");

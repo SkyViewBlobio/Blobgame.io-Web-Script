@@ -4,7 +4,7 @@ import { createBlobioStorage } from '../storage/BlobioStorage.js';
 const DEFAULT_CLASS_NAME = 'blobio-menu-enabled';
 const DEFAULT_STYLE_ID = 'blobio-menu-style';
 const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
-const DEFAULT_EXTENSION_VERSION = '0.1.39';
+const DEFAULT_EXTENSION_VERSION = '0.1.42';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -20,11 +20,10 @@ const CUSTOM_SKIN_SELECTED_KEY = 'blobio.customSkin.selectedUrl';
 const CUSTOM_SKIN_CARRIER_ASSET_KEY = 'blobio.customSkin.carrierAsset';
 const CUSTOM_SKIN_CARRIER_NAME_KEY = 'blobio.customSkin.carrierName';
 const CUSTOM_SKIN_CARRIER_TYPE_KEY = 'blobio.customSkin.carrierType';
-const CUSTOM_SKIN_PREPARED_KEY = 'blobio.customSkin.preparedDataUrl';
-const CUSTOM_SKIN_PREPARED_SOURCE_KEY = 'blobio.customSkin.preparedSource';
 const CUSTOM_SKIN_DEFAULT_URL = 'https://i.imgur.com/OZz80VZ.jpeg';
 const DIRECT_IMGUR_IMAGE_MATCH = /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|webp)(?:\?.*)?$/i;
 const CUSTOM_SKIN_NOTICE_DURATION = 2200;
+const CUSTOM_SKIN_RELOAD_SECONDS = 3;
 const MAIN_MENU_ALIGNMENT_CLASS = 'blobio-main-menu-align-target';
 const MAIN_MENU_LAYERED_SELECT_CLASS = 'blobio-menu-layered-select';
 
@@ -1192,15 +1191,6 @@ export class MenuFeature {
     this.storage?.setItem?.(CUSTOM_SKIN_CARRIER_TYPE_KEY, carrier.type);
   }
 
-  async prepareCustomSkinAsset(url) {
-    const prepare = globalThis.__blobioPrepareCustomSkinAsset;
-    if (typeof prepare !== 'function') {
-      return null;
-    }
-
-    return prepare(url);
-  }
-
   async useCustomSkinUrl(url, panel = null) {
     const cleanUrl = String(url || '').trim();
     if (!this.isValidImgurSkinUrl(cleanUrl)) {
@@ -1222,19 +1212,13 @@ export class MenuFeature {
     }
 
     try {
-      await this.prepareCustomSkinAsset(cleanUrl);
       this.saveCustomSkinUse(cleanUrl, carrier);
       this.updateChooseSkinPreview(cleanUrl);
       this.activateCustomSkinPanel(skins);
       return { ok: true, carrier };
     } catch (error) {
       this.logger.warn('[Blobio] Could not apply Custom Skin.', error);
-      return {
-        ok: false,
-        reason: /prepar|download|decode|loader/i.test(error?.message || '')
-          ? 'image-preparation-failed'
-          : 'storage-error',
-      };
+      return { ok: false, reason: 'storage-error' };
     }
   }
 
@@ -1245,8 +1229,6 @@ export class MenuFeature {
       this.storage?.removeItem?.(CUSTOM_SKIN_CARRIER_ASSET_KEY);
       this.storage?.removeItem?.(CUSTOM_SKIN_CARRIER_NAME_KEY);
       this.storage?.removeItem?.(CUSTOM_SKIN_CARRIER_TYPE_KEY);
-      this.storage?.removeItem?.(CUSTOM_SKIN_PREPARED_KEY);
-      this.storage?.removeItem?.(CUSTOM_SKIN_PREPARED_SOURCE_KEY);
 
       if (carrier?.assetUrl) {
         this.updateChooseSkinPreview(carrier.assetUrl);
@@ -1369,6 +1351,12 @@ export class MenuFeature {
 
     const carrier = cards[Math.floor(randomValue * cards.length)] || cards[0];
     carrier.card.click?.();
+
+    await new Promise((resolve) => {
+      const setTimer = win.setTimeout || globalThis.setTimeout;
+      setTimer(resolve, 150);
+    });
+
     return carrier;
   }
 
@@ -1549,7 +1537,7 @@ export class MenuFeature {
       const result = await this.useCustomSkinUrl(panel.dataset.selectedSkinUrl || '', panel);
       if (result.ok) {
         this.renderCustomSkinGallery(panel);
-        this.showCustomSkinNotice(panel, 'Skin is now applied', 'success');
+        this.startCustomSkinReloadCountdown(panel);
       } else {
         this.showCustomSkinUseError(panel, result.reason);
       }
@@ -1579,7 +1567,6 @@ export class MenuFeature {
       'no-owned-skins': 'Own at least one skin in the Owned section to use Custom Skin.',
       'skins-unavailable': 'Open the Skins menu and try again.',
       'invalid-url': 'Select a valid Custom Skin first.',
-      'image-preparation-failed': 'The Custom Skin image could not be downloaded or processed. Check the image URL and try again.',
     };
     this.showCustomSkinNotice(panel, messages[reason] || 'Custom Skin could not be applied.', 'error');
   }
@@ -1679,6 +1666,40 @@ export class MenuFeature {
     const active = this.getActiveCustomSkinUrl();
     const carrier = this.getCustomSkinCarrier();
     row.textContent = `Selected: ${selected || 'none'} | Applied: ${active || 'none'} | Carrier: ${carrier?.name || 'none'}`;
+  }
+
+  startCustomSkinReloadCountdown(panel) {
+    const win = this.document.defaultView || globalThis;
+    let seconds = CUSTOM_SKIN_RELOAD_SECONDS;
+
+    this.clearCustomSkinNoticeTimer();
+    for (const oldNotice of this.document.querySelectorAll?.('.blobio-custom-skin-notice') || []) {
+      oldNotice.remove();
+    }
+
+    const notice = this.document.createElement('div');
+    notice.classList.add('blobio-custom-skin-notice', 'is-floating', 'is-success');
+    notice.setAttribute('aria-live', 'assertive');
+    (this.document.body || panel)?.appendChild(notice);
+
+    const tick = () => {
+      notice.textContent = seconds > 0
+        ? `Custom Skin ready. Reloading in ${seconds}…`
+        : 'Reloading…';
+
+      if (seconds <= 0) {
+        this.customSkinNoticeTimer = null;
+        if (typeof win.location?.reload === 'function') {
+          win.location.reload();
+        }
+        return;
+      }
+
+      seconds -= 1;
+      this.customSkinNoticeTimer = win.setTimeout?.(tick, 1000) ?? globalThis.setTimeout(tick, 1000);
+    };
+
+    tick();
   }
 
   showCustomSkinNotice(panel, message, type) {

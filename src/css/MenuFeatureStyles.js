@@ -1052,53 +1052,6 @@ html.${className} .blobio-custom-skin-notice.is-error {
   box-shadow: 0 0 16px rgba(255, 49, 49, 0.3), inset 0 0 9px rgba(255, 89, 89, 0.18);
 }
 
-html.${className} .blobio-vip-plus-slot {
-  position: fixed !important;
-  left: var(--blobio-vip-plus-left, -9999px) !important;
-  top: var(--blobio-vip-plus-top, -9999px) !important;
-  z-index: 4 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: max-content !important;
-  height: max-content !important;
-  margin: 0 !important;
-  line-height: 0 !important;
-  transform: translateY(-50%) !important;
-  transition: none !important;
-  animation: none !important;
-  pointer-events: none !important;
-  isolation: isolate;
-}
-
-html.${className} .blobio-vip-plus-icon {
-  display: block !important;
-  width: auto !important;
-  height: var(--blobio-vip-plus-size, 75px) !important;
-  max-width: 128px !important;
-  margin: 0 !important;
-  object-fit: contain !important;
-  transform: scale(1) !important;
-  scale: 1 !important;
-  transform-origin: center;
-  transition: transform 170ms ease, filter 170ms ease !important;
-  animation: none !important;
-  filter: drop-shadow(0 0 7px rgba(255, 196, 55, 0.28));
-  cursor: pointer;
-  pointer-events: auto !important;
-}
-
-html.${className} .blobio-vip-plus-icon:hover {
-  transform: scale(1.09) !important;
-  filter: drop-shadow(0 0 11px rgba(255, 204, 72, 0.48));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html.${className} .blobio-vip-plus-icon {
-    transition: none !important;
-  }
-}
-
 html.${className} .blobio-watermark-host {
   position: relative;
 }

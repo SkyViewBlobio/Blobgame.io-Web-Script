@@ -6,17 +6,22 @@ import socialsButtonUrl from '../assets/socal_icon_n.png';
 import updatesButtonUrl from '../assets/update_notes_n_.png';
 import youtubeIconUrl from '../assets/youtube_icon.png';
 import recommendedButtonUrl from '../assets/yt_recommended_n.png';
-import vipPlusIconUrl from '../assets/VIP_icon_plus.png';
 import { BackgroundFeature } from './features/BackgroundFeature.js';
+import { ChatRoleFeature } from './features/ChatRoleFeature.js';
 import { MenuFeature } from './features/MenuFeature.js';
+import { VipBadgeFeature } from './features/VipBadgeFeature.js';
 import { getBlobioHostMode } from './hostRules.js';
+import { ProfileUidDetector } from './roles/ProfileUidDetector.js';
+import { RoleRegistry } from './roles/RoleRegistry.js';
 
 const INSTANCE_KEY = '__blobioExtension';
+const VIP_BADGE_URL = 'https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Web-Script/main/assets/VIP_icon_plus.png';
 
 class BlobioExtension {
   constructor(windowRef = globalThis) {
     this.window = windowRef;
     this.features = [];
+    this.roleRegistry = null;
     this.started = false;
   }
 
@@ -41,6 +46,10 @@ class BlobioExtension {
       return true;
     }
 
+    const logger = this.window.console || console;
+    this.roleRegistry = new RoleRegistry({ document, logger });
+    this.roleRegistry.start();
+
     const menuAssets = {
       recommendedButton: recommendedButtonUrl,
       updatesButton: updatesButtonUrl,
@@ -49,26 +58,28 @@ class BlobioExtension {
       discordIcon: discordIconUrl,
       facebookIcon: facebookIconUrl,
       instagramIcon: instagramIconUrl,
-      vipPlusIcon: vipPlusIconUrl,
     };
 
     if (hostMode === 'frontpage') {
-      this.features.push(new BackgroundFeature({
-        document,
-        backgroundUrl,
-        logger: this.window.console || console,
-      }));
+      const uidDetector = new ProfileUidDetector({ document, logger });
+
+      this.features.push(
+        new BackgroundFeature({ document, backgroundUrl, logger }),
+        new MenuFeature({ document, logger, assets: menuAssets, frontPageUi: true }),
+        uidDetector,
+        new VipBadgeFeature({
+          document,
+          logger,
+          roleRegistry: this.roleRegistry,
+          uidDetector,
+          badgeUrl: VIP_BADGE_URL,
+        }),
+      );
+    } else if (hostMode === 'runtime') {
+      this.features.push(
+        new ChatRoleFeature({ document, logger, roleRegistry: this.roleRegistry }),
+      );
     }
-
-    this.features.push(
-      new MenuFeature({
-        document,
-        logger: this.window.console || console,
-        assets: menuAssets,
-        frontPageUi: hostMode === 'frontpage',
-      }),
-    );
-
 
     for (const feature of this.features) {
       feature.start();
@@ -84,6 +95,8 @@ class BlobioExtension {
     }
 
     this.features = [];
+    this.roleRegistry?.destroy();
+    this.roleRegistry = null;
     this.started = false;
   }
 }

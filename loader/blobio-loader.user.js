@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Blobio Web Script Loader
 // @namespace    https://github.com/SkyViewBlobio/Blobgame.io-Web-Script
-// @version      0.1.47
+// @version      0.1.48
 // @description  Loads the Blobio modular extension bundle from GitHub.
 // @match        *://blobgame.io/*
 // @match        *://custom.client.blobgame.io/*
@@ -23,7 +23,7 @@
   'use strict';
 
   const LOG_PREFIX = '[Blobio]';
-  const VERSION = '0.1.47';
+  const VERSION = '0.1.48';
   const CUSTOM_CLIENT_HOST = 'custom.client.blobgame.io';
   const STORAGE_BRIDGE_SOURCE = 'BlobioExtensionStorageBridge';
   const CUSTOM_SKIN_ENABLED_KEY = 'blobio.customSkin.enabled';
@@ -94,8 +94,9 @@
     removeLocalValue(key);
   }
 
-  function isCustomSkinStorageKey(key) {
-    return String(key || '').startsWith('blobio.customSkin.');
+  function isSharedStorageKey(key) {
+    const value = String(key || '');
+    return value.startsWith('blobio.customSkin.') || value.startsWith('blobio.roles.');
   }
 
   function installSharedStorageBridge() {
@@ -105,17 +106,17 @@
 
     globalThis.__blobioSharedStorageBridge = {
       getItem(key) {
-        return isCustomSkinStorageKey(key) ? getSharedValue(key) : getLocalValue(key);
+        return isSharedStorageKey(key) ? getSharedValue(key) : getLocalValue(key);
       },
       setItem(key, value) {
-        if (isCustomSkinStorageKey(key)) {
+        if (isSharedStorageKey(key)) {
           setSharedValue(key, value);
         } else {
           setLocalValue(key, value);
         }
       },
       removeItem(key) {
-        if (isCustomSkinStorageKey(key)) {
+        if (isSharedStorageKey(key)) {
           removeSharedValue(key);
         } else {
           removeLocalValue(key);
@@ -125,7 +126,7 @@
 
     window.addEventListener?.('message', (event) => {
       const message = event.data;
-      if (!message || message.source !== STORAGE_BRIDGE_SOURCE || !isCustomSkinStorageKey(message.key)) {
+      if (!message || message.source !== STORAGE_BRIDGE_SOURCE || !isSharedStorageKey(message.key)) {
         return;
       }
 

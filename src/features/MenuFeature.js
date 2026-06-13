@@ -4,7 +4,7 @@ import { createBlobioStorage } from '../storage/BlobioStorage.js';
 const DEFAULT_CLASS_NAME = 'blobio-menu-enabled';
 const DEFAULT_STYLE_ID = 'blobio-menu-style';
 const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
-const DEFAULT_EXTENSION_VERSION = '0.1.47';
+const DEFAULT_EXTENSION_VERSION = '0.1.48';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -140,10 +140,6 @@ export class MenuFeature {
     this.extensionTooltip = null;
     this.documentClickHandler = null;
     this.keydownHandler = null;
-    this.vipPlusIcon = null;
-    this.vipPlusSlot = null;
-    this.vipPlusTarget = null;
-    this.vipPlusViewportHandler = null;
   }
 
   start() {
@@ -172,8 +168,6 @@ export class MenuFeature {
     this.installCustomSkinUi();
     this.syncWatermark();
     this.syncUsernameAnimation();
-    this.syncVipPlusIcon();
-    this.installVipPlusPositionTracking();
     this.watchPage();
 
     this.documentClickHandler = (event) => {
@@ -222,8 +216,6 @@ export class MenuFeature {
     this.clearCustomSkinNoticeTimer();
     this.cleanupExtensionSettings();
     this.cleanupCustomSkinUi();
-    this.removeVipPlusPositionTracking();
-    this.removeVipPlusIcon();
 
     for (const node of this.hiddenOriginalNodes) {
       node.classList?.remove(HIDDEN_CLASS);
@@ -371,9 +363,8 @@ export class MenuFeature {
       this.syncCustomSkinAvailability();
       this.installExtensionSettings();
       this.installCustomSkinUi();
-        this.syncWatermark();
+      this.syncWatermark();
       this.syncUsernameAnimation();
-      this.syncVipPlusIcon();
     }, 0);
   }
 
@@ -1862,106 +1853,6 @@ export class MenuFeature {
     for (const host of this.document.querySelectorAll?.('.blobio-custom-skin-notice-host') || []) {
       host.classList?.remove('blobio-custom-skin-notice-host');
     }
-  }
-
-  syncVipPlusIcon() {
-    if (!this.frontPageUi || !this.assets.vipPlusIcon) {
-      this.removeVipPlusIcon();
-      return;
-    }
-
-    const target = Array.from(this.document.querySelectorAll?.('img') || [])
-      .find((image) => this.isMassBoosterImage(image));
-    const host = this.document.body;
-
-    if (!target || !host) {
-      this.removeVipPlusIcon();
-      return;
-    }
-
-    let slot = this.vipPlusSlot;
-    if (!slot) {
-      slot = this.document.createElement('span');
-      slot.classList.add('blobio-vip-plus-slot');
-      this.vipPlusSlot = slot;
-    }
-
-    let icon = this.vipPlusIcon;
-    if (!icon) {
-      icon = this.document.createElement('img');
-      icon.classList.add('blobio-vip-plus-icon');
-      icon.setAttribute('src', this.assets.vipPlusIcon);
-      icon.setAttribute('alt', 'VIP+');
-      icon.setAttribute('title', 'VIP+');
-      icon.setAttribute('draggable', 'false');
-      this.vipPlusIcon = icon;
-    }
-
-    if (icon.parentNode !== slot) {
-      slot.appendChild(icon);
-    }
-
-    if (slot.parentNode !== host) {
-      host.appendChild(slot);
-    }
-
-    this.vipPlusTarget = target;
-    const rect = target.getBoundingClientRect?.();
-    const height = Number(rect?.height) || Number(target.clientHeight) || Number(target.height) || 0;
-
-    if (height >= 18 && height <= 120) {
-      this.setStyleProperty(icon, '--blobio-vip-plus-size', `${Math.round(height * 1.5)}px`);
-    }
-
-    const right = Number(rect?.right);
-    const top = Number(rect?.top);
-    if (Number.isFinite(right) && Number.isFinite(top) && height > 0) {
-      this.setStyleProperty(slot, '--blobio-vip-plus-left', `${Math.round(right + 10)}px`);
-      this.setStyleProperty(slot, '--blobio-vip-plus-top', `${Math.round(top + height / 2)}px`);
-    }
-  }
-
-  installVipPlusPositionTracking() {
-    if (this.vipPlusViewportHandler) {
-      return;
-    }
-
-    const win = this.document.defaultView;
-    if (!win?.addEventListener) {
-      return;
-    }
-
-    this.vipPlusViewportHandler = () => this.syncVipPlusIcon();
-    win.addEventListener('resize', this.vipPlusViewportHandler);
-    win.addEventListener('scroll', this.vipPlusViewportHandler, true);
-  }
-
-  removeVipPlusPositionTracking() {
-    if (!this.vipPlusViewportHandler) {
-      return;
-    }
-
-    const win = this.document.defaultView;
-    win?.removeEventListener?.('resize', this.vipPlusViewportHandler);
-    win?.removeEventListener?.('scroll', this.vipPlusViewportHandler, true);
-    this.vipPlusViewportHandler = null;
-  }
-
-  isMassBoosterImage(image) {
-    const source = String(image?.getAttribute?.('src') || image?.src || '')
-      .split('#')[0]
-      .split('?')[0]
-      .toLowerCase();
-
-    return source.endsWith('/assets/images/mass_booster_web_trans.png') || source === 'assets/images/mass_booster_web_trans.png';
-  }
-
-  removeVipPlusIcon() {
-    this.vipPlusSlot?.remove();
-    this.vipPlusIcon?.remove();
-    this.vipPlusSlot = null;
-    this.vipPlusIcon = null;
-    this.vipPlusTarget = null;
   }
 
   syncWatermark() {

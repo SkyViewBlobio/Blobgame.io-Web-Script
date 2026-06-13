@@ -1,4 +1,4 @@
-const SHARED_KEY_PREFIX = 'blobio.customSkin.';
+const SHARED_KEY_PREFIXES = ['blobio.customSkin.', 'blobio.roles.'];
 const STORAGE_BRIDGE_SOURCE = 'BlobioExtensionStorageBridge';
 
 
@@ -41,7 +41,8 @@ function getSharedBridge(document) {
 }
 
 function isSharedKey(key) {
-  return String(key || '').startsWith(SHARED_KEY_PREFIX);
+  const value = String(key || '');
+  return SHARED_KEY_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
 function postSharedStorageMessage(document, type, key, value = '') {

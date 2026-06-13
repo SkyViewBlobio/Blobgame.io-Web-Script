@@ -83,7 +83,7 @@ export class CustomSkinOverlayFeature {
   injectPageOverlayRefresh(nextState) {
     const script = this.document.createElement('script');
     script.dataset.blobioCustomSkinOverlayRefresh = 'true';
-    script.textContent = `;(() => {\n  const state = ${JSON.stringify(nextState)};\n  window.__blobioCustomSkinOverlayV10?.refresh?.(state);\n})();`;
+    script.textContent = `;(() => {\n  const state = ${JSON.stringify(nextState)};\n  window.__blobioCustomSkinOverlayV11?.refresh?.(state);\n})();`;
     (this.document.documentElement || this.document.head || this.document.body)?.appendChild?.(script);
     script.remove();
   }
@@ -279,9 +279,13 @@ function pageOverlayMain(initialState) {
   const OWN_CLUSTER_MAX_AGE_MS = 650;
   const OWN_CLUSTER_LIMIT = 32;
   const OWN_CLUSTER_MIN_SIZE = 12;
+  const SIBLING_ID_WINDOW = 24;
+  const SIBLING_MIN_OBSERVATIONS = 3;
+  const SIBLING_MAX_AGE_MS = 1400;
+  const SIBLING_MAX_DISTANCE_FACTOR = 34;
 
-  if (window.__blobioCustomSkinOverlayV10) {
-    window.__blobioCustomSkinOverlayV10.refresh?.(initialState);
+  if (window.__blobioCustomSkinOverlayV11) {
+    window.__blobioCustomSkinOverlayV11.refresh?.(initialState);
     return;
   }
 
@@ -333,6 +337,10 @@ function pageOverlayMain(initialState) {
     localPlayerName: '',
     packetNameMatches: [],
     rawOwnRecords: [],
+    siblingCandidateScores: new Map(),
+    siblingOwnIds: new Set(),
+    siblingOwnCandidates: [],
+    siblingOwnMatches: [],
     };
 
   function refresh(nextState) {
@@ -663,7 +671,7 @@ function pageOverlayMain(initialState) {
 
     state.renderMode = state.screenCircleMatches.some((item) => item.mode === 'screen-circle')
       ? 'screen-circle'
-      : (state.inferredOwnIds.size ? 'packet-cluster' : 'world-transform');
+      : (state.inferredOwnIds.size ? 'sibling-id' : 'world-transform');
     state.drawn = drawn;
     state.frame += 1;
 
@@ -787,26 +795,141 @@ function pageOverlayMain(initialState) {
       .map((id) => state.nodes.get(id))
       .filter((node) => node && !node.removed && (!node.updatedAt || now - node.updatedAt <= OWN_CLUSTER_MAX_AGE_MS * 4));
 
-    // v10: do not guess nearby cells anymore. The v9 cluster heuristic produced false duplicates.
-    // Only render cells that are confirmed through own-list/AddNode or packet name matching.
-    state.inferredOwnIds.clear();
-    state.ownClusterCandidates = [];
-    state.ownClusterMatches = [];
+    pruneSiblingCandidates(now);
 
-    const renderNodes = confirmed.map((node) => ({ ...node, ownership: 'confirmed' }));
+    const confirmedIds = new Set(confirmed.map((node) => node.id));
+    const siblings = Array.from(state.siblingOwnIds)
+      .filter((id) => !confirmedIds.has(id))
+      .map((id) => state.nodes.get(id))
+      .filter((node) => node && !node.removed && (!node.updatedAt || now - node.updatedAt <= SIBLING_MAX_AGE_MS));
+
+    state.inferredOwnIds.clear();
+    for (const node of siblings) state.inferredOwnIds.add(node.id);
+
+    const renderNodes = [
+      ...confirmed.map((node) => ({ ...node, ownership: 'confirmed', inferScore: null })),
+      ...siblings.map((node) => ({
+        ...node,
+        ownership: 'sibling-id',
+        inferScore: state.siblingCandidateScores.get(node.id)?.score ?? null,
+      })),
+    ].sort((a, b) => (b.size || 0) - (a.size || 0)).slice(0, OWN_CLUSTER_LIMIT);
+
+    state.ownClusterCandidates = state.siblingOwnCandidates.slice(-40);
+    state.ownClusterMatches = siblings.map((node) => ({
+      id: node.id,
+      x: Math.round(node.x),
+      y: Math.round(node.y),
+      size: Math.round(node.size),
+      score: state.siblingCandidateScores.get(node.id)?.score ?? null,
+      observations: state.siblingCandidateScores.get(node.id)?.observations ?? null,
+      ownership: 'sibling-id',
+    }));
+    state.siblingOwnMatches = state.ownClusterMatches;
+
     state.ownRenderNodes = renderNodes.map((node) => ({
       id: node.id,
       rawId: node.rawId ?? null,
-      ownership: 'confirmed',
+      ownership: node.ownership || 'confirmed',
       x: Math.round(node.x),
       y: Math.round(node.y),
       size: Math.round(node.size),
       name: node.name || '',
       skin: node.skin || '',
-      inferScore: null,
+      inferScore: node.inferScore ?? null,
     }));
 
     return renderNodes;
+  }
+
+  function updateSiblingOwnershipCandidates(records, protocol) {
+    if (!records || !records.length || !state.ownIds.size) return;
+
+    const now = performance.now();
+    const confirmed = Array.from(state.ownIds)
+      .map((id) => state.nodes.get(id))
+      .filter((node) => node && !node.removed && Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.size));
+
+    if (!confirmed.length) return;
+
+    for (const record of records) {
+      if (!record || !record.id || state.ownIds.has(record.id)) continue;
+      if (!Number.isFinite(record.x) || !Number.isFinite(record.y) || !Number.isFinite(record.size)) continue;
+      if (record.size < OWN_CLUSTER_MIN_SIZE || record.size > 2000) continue;
+
+      let best = null;
+      let bestScore = -Infinity;
+
+      for (const own of confirmed) {
+        const idDelta = Math.abs((record.id >>> 0) - (own.id >>> 0));
+        if (idDelta < 1 || idDelta > SIBLING_ID_WINDOW) continue;
+
+        const sizeRatio = record.size / Math.max(own.size || 1, 1);
+        if (sizeRatio < 0.18 || sizeRatio > 1.45) continue;
+
+        const distance = Math.hypot(record.x - own.x, record.y - own.y);
+        const maxDistance = Math.max(260, (Math.max(own.size || 1, record.size || 1) + Math.min(own.size || 1, record.size || 1)) * SIBLING_MAX_DISTANCE_FACTOR);
+        if (distance > maxDistance) continue;
+
+        const score = (SIBLING_ID_WINDOW - idDelta) * 3
+          + Math.max(0, 30 - (distance / Math.max(1, Math.max(own.size || 1, record.size || 1))))
+          + Math.max(0, 20 - Math.abs(1 - sizeRatio) * 20);
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = {
+            id: record.id,
+            rawId: record.rawId ?? record.id,
+            ownId: own.id,
+            idDelta,
+            distance: Math.round(distance),
+            maxDistance: Math.round(maxDistance),
+            size: Math.round(record.size),
+            ownSize: Math.round(own.size),
+            sizeRatio: Number(sizeRatio.toFixed(3)),
+            score: Number(score.toFixed(2)),
+            protocol,
+          };
+        }
+      }
+
+      if (!best) continue;
+
+      const existing = state.siblingCandidateScores.get(record.id) || { score: 0, observations: 0, firstSeen: now };
+      const next = {
+        ...existing,
+        score: Math.min(1000, existing.score + Math.max(1, best.score / 20)),
+        observations: existing.observations + 1,
+        lastSeen: now,
+        detail: best,
+      };
+      state.siblingCandidateScores.set(record.id, next);
+
+      const summary = { ...best, observations: next.observations, accumulatedScore: Number(next.score.toFixed(2)) };
+      state.siblingOwnCandidates.push(summary);
+      while (state.siblingOwnCandidates.length > 120) state.siblingOwnCandidates.shift();
+
+      if (next.observations >= SIBLING_MIN_OBSERVATIONS && next.score >= 4) {
+        state.siblingOwnIds.add(record.id);
+      }
+    }
+
+    pruneSiblingCandidates(now);
+  }
+
+  function pruneSiblingCandidates(now = performance.now()) {
+    for (const [id, candidate] of state.siblingCandidateScores.entries()) {
+      if (!candidate || now - (candidate.lastSeen || candidate.firstSeen || 0) > SIBLING_MAX_AGE_MS) {
+        state.siblingCandidateScores.delete(id);
+        state.siblingOwnIds.delete(id);
+      }
+    }
+
+    for (const id of Array.from(state.siblingOwnIds)) {
+      if (!state.siblingCandidateScores.has(id) || !state.nodes.has(id)) {
+        state.siblingOwnIds.delete(id);
+      }
+    }
   }
 
   function weightedNodeCenter(nodes) {
@@ -891,8 +1014,8 @@ function pageOverlayMain(initialState) {
   function installCanvasCircleTracker() {
     if (state.canvasHooked) return;
     const proto = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
-    if (!proto || proto.__blobioSkinCircleTrackerV10) return;
-    proto.__blobioSkinCircleTrackerV10 = true;
+    if (!proto || proto.__blobioSkinCircleTrackerV11) return;
+    proto.__blobioSkinCircleTrackerV11 = true;
     state.canvasHooked = true;
 
     const originalArc = proto.arc;
@@ -1228,6 +1351,11 @@ function pageOverlayMain(initialState) {
     if (opcode === 0x12 || opcode === 0x14) {
       state.nodes.clear();
       state.ownIds.clear();
+      state.inferredOwnIds.clear();
+      state.siblingCandidateScores.clear();
+      state.siblingOwnIds.clear();
+      state.siblingOwnCandidates = [];
+      state.siblingOwnMatches = [];
       state.camera.source = 'average';
       log('clear nodes packet', { opcode }, 'packet');
     }
@@ -1486,6 +1614,8 @@ function pageOverlayMain(initialState) {
         updatedAt: now,
       });
     }
+
+    updateSiblingOwnershipCandidates(parsed.records, parsed.protocol);
 
     const removed = parsed.removed.map((id) => decodeNodeId(id));
     for (const id of removed) {
@@ -1802,7 +1932,7 @@ function pageOverlayMain(initialState) {
   function downloadDebugDump() {
     const dump = {
       meta: {
-        version: 'packet-overlay-v10',
+        version: 'packet-overlay-v11',
         createdAt: new Date().toISOString(),
         href: location.href,
       },
@@ -1825,6 +1955,10 @@ function pageOverlayMain(initialState) {
         inferredOwnIds: Array.from(state.inferredOwnIds),
         ownClusterCandidates: state.ownClusterCandidates,
         ownClusterMatches: state.ownClusterMatches,
+        siblingOwnIds: Array.from(state.siblingOwnIds),
+        siblingOwnCandidates: state.siblingOwnCandidates.slice(-80),
+        siblingOwnMatches: state.siblingOwnMatches,
+        siblingCandidateScores: Array.from(state.siblingCandidateScores.entries()).slice(-80).map(([id, item]) => ({ id, score: item.score, observations: item.observations, detail: item.detail })),
         scrambleId: state.scrambleId,
         scrambleCandidates: state.scrambleCandidates,
         localPlayerName: state.localPlayerName || getLocalPlayerName(),
@@ -1864,7 +1998,7 @@ function pageOverlayMain(initialState) {
     }, 1000);
   }
 
-  window.__blobioCustomSkinOverlayV10 = {
+  window.__blobioCustomSkinOverlayV11 = {
     state,
     refresh,
     dump: () => ({
@@ -1882,6 +2016,9 @@ function pageOverlayMain(initialState) {
       inferredOwnIds: Array.from(state.inferredOwnIds),
       ownClusterCandidates: state.ownClusterCandidates,
       ownClusterMatches: state.ownClusterMatches,
+      siblingOwnIds: Array.from(state.siblingOwnIds),
+      siblingOwnCandidates: state.siblingOwnCandidates.slice(-40),
+      siblingOwnMatches: state.siblingOwnMatches,
       scrambleId: state.scrambleId,
       localPlayerName: state.localPlayerName || getLocalPlayerName(),
       packetNameMatches: state.packetNameMatches.slice(-20),

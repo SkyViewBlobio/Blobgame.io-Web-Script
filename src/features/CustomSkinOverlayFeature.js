@@ -83,7 +83,7 @@ export class CustomSkinOverlayFeature {
   injectPageOverlayRefresh(nextState) {
     const script = this.document.createElement('script');
     script.dataset.blobioCustomSkinOverlayRefresh = 'true';
-    script.textContent = `;(() => {\n  const state = ${JSON.stringify(nextState)};\n  window.__blobioCustomSkinOverlayV15?.refresh?.(state);\n})();`;
+    script.textContent = `;(() => {\n  const state = ${JSON.stringify(nextState)};\n  window.__blobioCustomSkinOverlayV16?.refresh?.(state);\n})();`;
     (this.document.documentElement || this.document.head || this.document.body)?.appendChild?.(script);
     script.remove();
   }
@@ -279,17 +279,18 @@ function pageOverlayMain(initialState) {
   const OWN_CLUSTER_MAX_AGE_MS = 650;
   const OWN_CLUSTER_LIMIT = 32;
   const OWN_CLUSTER_MIN_SIZE = 12;
-  const SIBLING_ID_WINDOW = 24;
+  const SIBLING_ID_WINDOW = 15;
   const SIBLING_MIN_OBSERVATIONS = 3;
   const SIBLING_MAX_AGE_MS = 1400;
   const SIBLING_MAX_DISTANCE_FACTOR = 34;
-  const ZOOM_FACTOR_STORAGE_KEY = 'blobio.customSkin.overlayZoomFactor';
+  const WEBGL_MATRIX_MAX_AGE_MS = 500;
+  const WEBGL_MATRIX_LIMIT = 96;
+  const ZOOM_FACTOR_STORAGE_KEY = 'blobio.customSkin.overlayZoomFactorV16';
   const ZOOM_FACTOR_MIN = 0.25;
   const ZOOM_FACTOR_MAX = 4;
-  const ZOOM_WHEEL_SENSITIVITY = 0.00115;
 
-  if (window.__blobioCustomSkinOverlayV15) {
-    window.__blobioCustomSkinOverlayV15.refresh?.(initialState);
+  if (window.__blobioCustomSkinOverlayV16) {
+    window.__blobioCustomSkinOverlayV16.refresh?.(initialState);
     return;
   }
 
@@ -352,6 +353,10 @@ function pageOverlayMain(initialState) {
     lastViewport: null,
     lastCanvasRect: null,
     lastEffectiveScale: 1,
+    webglMatrices: [],
+    activeWebglTransform: null,
+    webglMatrixMatches: [],
+    webglHookCount: 0,
     siblingOwnCandidates: [],
     siblingOwnMatches: [],
     };
@@ -645,14 +650,24 @@ function pageOverlayMain(initialState) {
     const usedCircles = new Set();
     const ownNodes = buildOwnRenderNodes();
     updateCameraFromRenderNodes(ownNodes);
+    const webglTransform = selectBestWebglTransform(ownNodes, rect);
 
     for (const node of ownNodes) {
-      const matchedCircle = pickBestScreenCircleForNode(node, freshCircles, usedCircles, rect, ownNodes);
+      const matchedCircle = webglTransform
+        ? null
+        : pickBestScreenCircleForNode(node, freshCircles, usedCircles, rect, ownNodes);
       let screen;
       let radius;
       let mode;
+      let drawRect = rect;
 
-      if (matchedCircle) {
+      if (webglTransform) {
+        const projected = projectWithWebglTransform(node, webglTransform);
+        screen = { x: projected.x, y: projected.y };
+        radius = projected.radius;
+        drawRect = webglTransform.rect;
+        mode = 'webgl-matrix';
+      } else if (matchedCircle) {
         usedCircles.add(matchedCircle.index);
         screen = { x: matchedCircle.x, y: matchedCircle.y };
         radius = matchedCircle.r;
@@ -665,7 +680,7 @@ function pageOverlayMain(initialState) {
 
       const drawRadius = Math.max(MIN_CELL_SCREEN_RADIUS, radius * CELL_BORDER_OVERDRAW);
       if (!isFinite(screen.x) || !isFinite(screen.y) || !isFinite(drawRadius)) continue;
-      if (screen.x + drawRadius < rect.left || screen.y + drawRadius < rect.top || screen.x - drawRadius > rect.left + rect.width || screen.y - drawRadius > rect.top + rect.height) continue;
+      if (screen.x + drawRadius < drawRect.left || screen.y + drawRadius < drawRect.top || screen.x - drawRadius > drawRect.left + drawRect.width || screen.y - drawRadius > drawRect.top + drawRect.height) continue;
 
       drawSkinCircle(ctx, state.image, screen.x, screen.y, drawRadius);
       state.screenCircleMatches.push({
@@ -684,9 +699,11 @@ function pageOverlayMain(initialState) {
       drawn += 1;
     }
 
-    state.renderMode = state.screenCircleMatches.some((item) => item.mode === 'screen-circle')
-      ? 'screen-circle'
-      : (state.inferredOwnIds.size ? 'sibling-id' : 'world-transform');
+    state.renderMode = state.screenCircleMatches.some((item) => item.mode === 'webgl-matrix')
+      ? 'webgl-matrix'
+      : (state.screenCircleMatches.some((item) => item.mode === 'screen-circle')
+        ? 'screen-circle'
+        : (state.inferredOwnIds.size ? 'sibling-id' : 'world-transform'));
     state.drawn = drawn;
     state.frame += 1;
 
@@ -849,6 +866,8 @@ function pageOverlayMain(initialState) {
       x: Math.round(node.x),
       y: Math.round(node.y),
       size: Math.round(node.size),
+      flags: node.flags || 0,
+      extra: Number.isFinite(node.extra) ? node.extra : null,
       name: node.name || '',
       skin: node.skin || '',
       inferScore: node.inferScore ?? null,
@@ -876,8 +895,17 @@ function pageOverlayMain(initialState) {
       let bestScore = -Infinity;
 
       for (const own of confirmed) {
-        const idDelta = Math.abs((record.id >>> 0) - (own.id >>> 0));
+        const idDelta = (record.id >>> 0) - (own.id >>> 0);
         if (idDelta < 1 || idDelta > SIBLING_ID_WINDOW) continue;
+
+        // Split cells are created after the primary owned node and keep the same
+        // short-packet player signature. Viruses, pellets, boosters, coins and
+        // other system cells use different flags and/or extra metadata.
+        const recordFlags = record.flags || 0;
+        const ownFlags = own.flags || 0;
+        if ((recordFlags & 0x02) === 0 || (recordFlags & 0x21) !== 0) continue;
+        if (recordFlags !== ownFlags) continue;
+        if (Number.isFinite(record.extra) && Number.isFinite(own.extra) && record.extra !== own.extra) continue;
 
         const sizeRatio = record.size / Math.max(own.size || 1, 1);
         if (sizeRatio < 0.18 || sizeRatio > 1.45) continue;
@@ -902,6 +930,10 @@ function pageOverlayMain(initialState) {
             size: Math.round(record.size),
             ownSize: Math.round(own.size),
             sizeRatio: Number(sizeRatio.toFixed(3)),
+            flags: record.flags || 0,
+            extra: Number.isFinite(record.extra) ? record.extra : null,
+            ownFlags: own.flags || 0,
+            ownExtra: Number.isFinite(own.extra) ? own.extra : null,
             score: Number(score.toFixed(2)),
             protocol,
           };
@@ -1054,11 +1086,211 @@ function pageOverlayMain(initialState) {
     };
   }
 
+
+  function installWebglCameraTracker(win, label = 'window') {
+    if (!win) return;
+
+    for (const contextName of ['WebGLRenderingContext', 'WebGL2RenderingContext']) {
+      const Context = win[contextName];
+      const proto = Context?.prototype;
+      if (!proto || proto.__blobioSkinWebglCameraTrackerV16) continue;
+
+      const nativeUniformMatrix4fv = proto.uniformMatrix4fv;
+      if (typeof nativeUniformMatrix4fv !== 'function') continue;
+
+      proto.__blobioSkinWebglCameraTrackerV16 = true;
+      proto.uniformMatrix4fv = function blobioTrackedUniformMatrix4fv(location, transpose, value, ...rest) {
+        try {
+          recordWebglMatrix(this, value, rest, label, contextName);
+        } catch {}
+        return nativeUniformMatrix4fv.call(this, location, transpose, value, ...rest);
+      };
+
+      state.webglHookCount += 1;
+      recordFrameHook(label, `${contextName}.uniformMatrix4fv hooked`);
+    }
+  }
+
+  function recordWebglMatrix(context, value, rest, label, contextName) {
+    if (!value || typeof value.length !== 'number') return;
+
+    const sourceOffset = Number.isInteger(rest?.[0]) ? rest[0] : 0;
+    if (sourceOffset < 0 || sourceOffset + 16 > value.length) return;
+
+    const matrix = Array.from({ length: 16 }, (_, index) => Number(value[sourceOffset + index]));
+    if (!isLikelyOrthographicMatrix(matrix)) return;
+
+    const canvas = context?.canvas;
+    if (!canvas) return;
+
+    const now = performance.now();
+    const last = state.webglMatrices[state.webglMatrices.length - 1];
+    if (last && last.canvas === canvas && matricesAlmostEqual(last.matrix, matrix)) {
+      last.t = now;
+      last.label = label;
+      last.contextName = contextName;
+      return;
+    }
+
+    state.webglMatrices.push({ canvas, matrix, t: now, label, contextName });
+    if (state.webglMatrices.length > WEBGL_MATRIX_LIMIT) {
+      state.webglMatrices.splice(0, state.webglMatrices.length - WEBGL_MATRIX_LIMIT);
+    }
+  }
+
+  function isLikelyOrthographicMatrix(matrix) {
+    if (!Array.isArray(matrix) || matrix.length !== 16 || matrix.some((value) => !Number.isFinite(value))) return false;
+    if (Math.abs(matrix[15] - 1) > 0.02) return false;
+    if (Math.abs(matrix[3]) > 0.0001 || Math.abs(matrix[7]) > 0.0001 || Math.abs(matrix[11]) > 0.0001) return false;
+
+    const xScale = Math.hypot(matrix[0], matrix[1]);
+    const yScale = Math.hypot(matrix[4], matrix[5]);
+    if (xScale < 1e-7 || yScale < 1e-7 || xScale > 2 || yScale > 2) return false;
+
+    return true;
+  }
+
+  function matricesAlmostEqual(a, b) {
+    for (let index = 0; index < 16; index += 1) {
+      if (Math.abs(a[index] - b[index]) > 1e-7) return false;
+    }
+    return true;
+  }
+
+  function selectBestWebglTransform(nodes, fallbackRect) {
+    const now = performance.now();
+    const fresh = state.webglMatrices.filter((item) => now - item.t <= WEBGL_MATRIX_MAX_AGE_MS);
+    state.webglMatrices = fresh.slice(-WEBGL_MATRIX_LIMIT);
+    state.webglMatrixMatches = [];
+
+    if (!nodes?.length || !fresh.length) {
+      state.activeWebglTransform = null;
+      return null;
+    }
+
+    const weightedCenter = weightedNodeCenter(nodes);
+    let best = null;
+
+    for (const sample of fresh) {
+      const rect = sample.canvas?.getBoundingClientRect?.();
+      if (!rect || rect.width < 240 || rect.height < 180) continue;
+
+      const transform = { ...sample, rect };
+      const projectedCenter = projectPointWithMatrix(weightedCenter.x, weightedCenter.y, transform);
+      const centerDistance = Math.hypot(
+        projectedCenter.x - (rect.left + rect.width / 2),
+        projectedCenter.y - (rect.top + rect.height / 2),
+      );
+
+      let inside = 0;
+      let plausibleRadii = 0;
+      for (const node of nodes) {
+        const projected = projectWithWebglTransform(node, transform);
+        const margin = Math.max(80, projected.radius * 3);
+        if (
+          projected.x >= rect.left - margin
+          && projected.x <= rect.right + margin
+          && projected.y >= rect.top - margin
+          && projected.y <= rect.bottom + margin
+        ) {
+          inside += 1;
+        }
+        if (projected.radius >= 2 && projected.radius <= Math.min(rect.width, rect.height) * 0.48) {
+          plausibleRadii += 1;
+        }
+      }
+
+      const freshness = 1 - Math.min(1, (now - sample.t) / WEBGL_MATRIX_MAX_AGE_MS);
+      const score = inside * 30
+        + plausibleRadii * 8
+        + freshness * 20
+        - (centerDistance / Math.max(rect.width, rect.height)) * 90;
+
+      const summary = {
+        score: Number(score.toFixed(2)),
+        inside,
+        plausibleRadii,
+        centerDistance: Math.round(centerDistance),
+        ageMs: Math.round(now - sample.t),
+        contextName: sample.contextName,
+        label: sample.label,
+        canvas: {
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          left: Math.round(rect.left),
+          top: Math.round(rect.top),
+        },
+        matrix: sample.matrix.map((value) => Number(value.toFixed(7))),
+      };
+      state.webglMatrixMatches.push(summary);
+
+      if (!best || score > best.score) {
+        best = { ...transform, score };
+      }
+    }
+
+    state.webglMatrixMatches.sort((a, b) => b.score - a.score);
+    state.webglMatrixMatches = state.webglMatrixMatches.slice(0, 12);
+
+    if (!best || best.score < nodes.length * 18) {
+      state.activeWebglTransform = null;
+      return null;
+    }
+
+    const radiusScale = getWebglRadiusScale(best);
+    state.lastEffectiveScale = radiusScale;
+    state.activeWebglTransform = {
+      score: Number(best.score.toFixed(2)),
+      ageMs: Math.round(now - best.t),
+      contextName: best.contextName,
+      label: best.label,
+      radiusScale: Number(radiusScale.toFixed(6)),
+      canvas: {
+        width: Math.round(best.rect.width),
+        height: Math.round(best.rect.height),
+        left: Math.round(best.rect.left),
+        top: Math.round(best.rect.top),
+      },
+      matrix: best.matrix.map((value) => Number(value.toFixed(7))),
+    };
+
+    return best;
+  }
+
+  function projectWithWebglTransform(node, transform) {
+    const point = projectPointWithMatrix(node.x, node.y, transform);
+    return {
+      x: point.x,
+      y: point.y,
+      radius: Math.abs(node.size * getWebglRadiusScale(transform)),
+    };
+  }
+
+  function projectPointWithMatrix(x, y, transform) {
+    const matrix = transform.matrix;
+    const rect = transform.rect;
+    const clipX = matrix[0] * x + matrix[4] * y + matrix[12];
+    const clipY = matrix[1] * x + matrix[5] * y + matrix[13];
+
+    return {
+      x: rect.left + (clipX + 1) * rect.width / 2,
+      y: rect.top + (1 - clipY) * rect.height / 2,
+    };
+  }
+
+  function getWebglRadiusScale(transform) {
+    const matrix = transform.matrix;
+    const rect = transform.rect;
+    const xScale = Math.hypot(matrix[0], matrix[1]) * rect.width / 2;
+    const yScale = Math.hypot(matrix[4], matrix[5]) * rect.height / 2;
+    return (Math.abs(xScale) + Math.abs(yScale)) / 2;
+  }
+
   function installCanvasCircleTracker() {
     if (state.canvasHooked) return;
     const proto = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
-    if (!proto || proto.__blobioSkinCircleTrackerV15) return;
-    proto.__blobioSkinCircleTrackerV15 = true;
+    if (!proto || proto.__blobioSkinCircleTrackerV16) return;
+    proto.__blobioSkinCircleTrackerV16 = true;
     state.canvasHooked = true;
 
     const originalArc = proto.arc;
@@ -1155,7 +1387,9 @@ function pageOverlayMain(initialState) {
   }
 
   function hookWindow(win, label) {
-    if (!win || !win.WebSocket) return;
+    if (!win) return;
+    installWebglCameraTracker(win, label);
+    if (!win.WebSocket) return;
 
     const NativeWebSocket = win.WebSocket;
     if (!NativeWebSocket.__blobioSkinOverlayConstructorHooked) {
@@ -1974,6 +2208,7 @@ function pageOverlayMain(initialState) {
         size: record.size,
         color: record.color || null,
         flags: record.flags || 0,
+        extra: Number.isFinite(record.extra) ? record.extra : null,
         skin: record.skin || '',
         name: record.name || '',
         updatedAt: now,
@@ -2082,13 +2317,16 @@ function pageOverlayMain(initialState) {
           continue;
         }
 
+        const previous = state.nodes.get(id);
         state.nodes.set(id, {
+          ...previous,
           id,
           x,
           y,
           size,
-          color: null,
-          flags: 0,
+          color: previous?.color || null,
+          flags: previous?.flags || 0,
+          extra: Number.isFinite(previous?.extra) ? previous.extra : null,
           updatedAt: now,
           source: 'short-own-fallback',
         });
@@ -2298,7 +2536,7 @@ function pageOverlayMain(initialState) {
   function downloadDebugDump() {
     const dump = {
       meta: {
-        version: 'packet-overlay-v15',
+        version: 'packet-overlay-v16',
         createdAt: new Date().toISOString(),
         href: location.href,
       },
@@ -2318,6 +2556,9 @@ function pageOverlayMain(initialState) {
         zoomEvents: state.zoomEvents.slice(-20),
         viewport: state.lastViewport,
         canvasRect: state.lastCanvasRect,
+        webglHookCount: state.webglHookCount,
+        activeWebglTransform: state.activeWebglTransform,
+        webglMatrixMatches: state.webglMatrixMatches,
         drawn: state.drawn,
         renderMode: state.renderMode,
         screenCircleCandidates: state.screenCircleCandidates,
@@ -2373,7 +2614,7 @@ function pageOverlayMain(initialState) {
     }, 1000);
   }
 
-  window.__blobioCustomSkinOverlayV15 = {
+  window.__blobioCustomSkinOverlayV16 = {
     state,
     refresh,
     dump: () => ({
@@ -2412,6 +2653,9 @@ function pageOverlayMain(initialState) {
       zoomEvents: state.zoomEvents.slice(-20),
       viewport: state.lastViewport,
       canvasRect: state.lastCanvasRect,
+      webglHookCount: state.webglHookCount,
+      activeWebglTransform: state.activeWebglTransform,
+      webglMatrixMatches: state.webglMatrixMatches,
       lastPacketSummary: state.lastPacketSummary,
       events: state.debugEvents.slice(),
     }),
@@ -2420,24 +2664,9 @@ function pageOverlayMain(initialState) {
 
 
   function installZoomTracker() {
-    const applyWheelZoom = (event) => {
-      try {
-        if (!state.enabled) return;
-        const target = event.target;
-        const overlay = state.overlay;
-        const canvas = state.mainCanvas || findMainCanvas();
-        const targetCanvas = target && target.closest?.('canvas');
-        const inGameCanvas = targetCanvas && targetCanvas !== overlay && (!canvas || targetCanvas === canvas);
-        const overViewport = event.clientX >= 0 && event.clientY >= 0 && event.clientX <= (window.innerWidth || 0) && event.clientY <= (window.innerHeight || 0);
-        if (!inGameCanvas && !overViewport) return;
-        const delta = Number(event.deltaY || 0);
-        if (!Number.isFinite(delta) || Math.abs(delta) < 1) return;
-        const multiplier = Math.exp(-delta * ZOOM_WHEEL_SENSITIVITY);
-        setZoomFactor((state.zoomFactor || 1) * multiplier, 'wheel');
-      } catch {}
-    };
-
-    window.addEventListener('wheel', applyWheelZoom, { capture: true, passive: true });
+    // The game applies smoothing, limits and automatic mass-based zoom after wheel input.
+    // Mirroring raw wheel deltas cannot stay synchronized, so v16 reads the WebGL
+    // projection matrix instead. F7/F8 remain as fallback calibration only.
   }
 
   function nudgeZoomFactor(multiplier, source) {
@@ -2473,6 +2702,7 @@ function pageOverlayMain(initialState) {
   }, false);
 
   refresh(initialState);
+  installWebglCameraTracker(window, 'top');
   installCanvasCircleTracker();
   installZoomTracker();
   installSocketHooks();

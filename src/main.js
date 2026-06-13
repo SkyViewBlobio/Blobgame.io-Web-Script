@@ -8,7 +8,6 @@ import youtubeIconUrl from '../assets/youtube_icon.png';
 import recommendedButtonUrl from '../assets/yt_recommended_n.png';
 import { BackgroundFeature } from './features/BackgroundFeature.js';
 import { MenuFeature } from './features/MenuFeature.js';
-import { CustomSkinOverlayFeature } from './features/CustomSkinOverlayFeature.js';
 import { getBlobioHostMode } from './hostRules.js';
 
 const INSTANCE_KEY = '__blobioExtension';
@@ -68,12 +67,6 @@ class BlobioExtension {
       }),
     );
 
-    if (hostMode === 'runtime') {
-      this.features.push(new CustomSkinOverlayFeature({
-        document,
-        logger: this.window.console || console,
-      }));
-    }
 
     for (const feature of this.features) {
       feature.start();

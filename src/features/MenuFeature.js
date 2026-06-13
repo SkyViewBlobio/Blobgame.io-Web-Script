@@ -4,7 +4,7 @@ import { createBlobioStorage } from '../storage/BlobioStorage.js';
 const DEFAULT_CLASS_NAME = 'blobio-menu-enabled';
 const DEFAULT_STYLE_ID = 'blobio-menu-style';
 const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
-const DEFAULT_EXTENSION_VERSION = '0.1.24';
+const DEFAULT_EXTENSION_VERSION = '0.1.37';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -17,9 +17,6 @@ const CUSTOM_SKIN_ENABLED_KEY = 'blobio.customSkin.enabled';
 const CUSTOM_SKIN_GALLERY_KEY = 'blobio.customSkin.gallery';
 const CUSTOM_SKIN_ACTIVE_KEY = 'blobio.customSkin.activeUrl';
 const CUSTOM_SKIN_SELECTED_KEY = 'blobio.customSkin.selectedUrl';
-const CUSTOM_SKIN_PREVIOUS_KEY = 'blobio.customSkin.previousSkin';
-const CUSTOM_SKIN_LOCAL_NAME_KEY = 'blobio.customSkin.localName';
-const CUSTOM_SKIN_BASE_KEY = 'blobio.customSkin.baseSkin';
 const CUSTOM_SKIN_RUNTIME_ACTIVE_KEY = 'blobio.customSkin.runtimeActiveUrl';
 const CUSTOM_SKIN_PENDING_ACTIVE_KEY = 'blobio.customSkin.pendingActiveUrl';
 const CUSTOM_SKIN_UI_SELECTED_KEY = 'blobio.customSkin.uiSelectedUrl';
@@ -35,17 +32,14 @@ const CUSTOM_SKIN_URL_KEYS = [
   CUSTOM_SKIN_UI_SELECTED_KEY,
 ];
 const CUSTOM_SKIN_DEFAULT_URL = 'https://i.imgur.com/OZz80VZ.jpeg';
-const CUSTOM_SKIN_NAME = 'BlobioCustomSkin';
-const CUSTOM_SKIN_TYPE = 'free';
-const CUSTOM_SKIN_TYPES = ['free', 'premium'];
-const DIRECT_IMGUR_IMAGE_MATCH = /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i;
+const DIRECT_IMGUR_IMAGE_MATCH = /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|webp)(?:\?.*)?$/i;
 const CUSTOM_SKIN_NOTICE_DURATION = 2200;
 const MAIN_MENU_ALIGNMENT_CLASS = 'blobio-main-menu-align-target';
 const MAIN_MENU_LAYERED_SELECT_CLASS = 'blobio-menu-layered-select';
 
 const EXTENSION_OPTION_TOOLTIPS = {
   watermark: 'This option will display the Extension name text, alongside its current version.',
-  customSkin: 'Use saved direct i.imgur.com images as a local client-side skin overlay. No login or owned in-game skin is required; only you see it.',
+  customSkin: 'Use a saved direct i.imgur.com image as a native local skin. Your equipped game skin and network data stay unchanged; only you see it.',
 };
 
 const DEFAULT_VIDEO = {
@@ -169,7 +163,6 @@ export class MenuFeature {
       return false;
     }
 
-    this.syncCustomSkinRuntimeConfig();
     if (!this.frontPageUi) {
       this.started = true;
       return true;
@@ -1315,165 +1308,6 @@ export class MenuFeature {
     this.injectCustomSkinLaunchPagePatch(enabled && cleanUrl ? cleanUrl : '');
   }
 
-  getCustomSkinBaseConfig() {
-    try {
-      const raw = this.storage?.getItem?.(CUSTOM_SKIN_BASE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      return this.isValidSkinConfig(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
-  }
-
-  saveCustomSkinBaseConfig(config) {
-    if (!this.isValidSkinConfig(config)) {
-      return false;
-    }
-
-    this.storage?.setItem?.(CUSTOM_SKIN_BASE_KEY, JSON.stringify(config));
-    return true;
-  }
-
-  clearCustomSkinBaseConfig() {
-    this.storage?.removeItem?.(CUSTOM_SKIN_BASE_KEY);
-  }
-
-  isValidSkinConfig(config) {
-    return Boolean(
-      config &&
-      typeof config.name === 'string' &&
-      /^[a-z0-9_.-]+$/i.test(config.name) &&
-      typeof config.type === 'string' &&
-      CUSTOM_SKIN_TYPES.includes(config.type),
-    );
-  }
-
-  parseSkinConfigFromUrl(url) {
-    const path = this.getUrlPath(url);
-    const match = path.match(/\/skins\/(free|premium)\/([^/?#]+)\.png$/i);
-    if (!match) {
-      return null;
-    }
-
-    const config = {
-      type: match[1].toLowerCase(),
-      name: decodeURIComponent(match[2]),
-    };
-
-    return this.isValidSkinConfig(config) ? config : null;
-  }
-
-  getCurrentSkinConfig() {
-    const name = this.storage?.getItem?.('config-skin') || '';
-    const type = this.storage?.getItem?.('config-skin-type') || CUSTOM_SKIN_TYPE;
-    const config = { name, type };
-    return this.isValidSkinConfig(config) ? config : null;
-  }
-
-  uniqueSkinOptions(options) {
-    const valid = [];
-    const seen = new Set();
-
-    for (const option of options) {
-      if (!this.isValidSkinConfig(option)) {
-        continue;
-      }
-
-      const key = `${option.type}:${option.name}`;
-      if (seen.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      valid.push(option);
-    }
-
-    return valid;
-  }
-
-  getOwnedSkinOptions(skinsRoot = null) {
-    const root = skinsRoot || this.document;
-    const containers = [];
-
-    for (const container of root.querySelectorAll?.('.skins-container') || []) {
-      if (container.classList?.contains('owned') || container.dataset?.blobioSkinCategory === 'owned') {
-        containers.push(container);
-      }
-    }
-
-    const options = [];
-    for (const container of containers) {
-      for (const image of container.querySelectorAll?.('img') || []) {
-        const config = this.parseSkinConfigFromUrl(image.getAttribute?.('src') || image.src || '');
-        if (config) {
-          options.push(config);
-        }
-      }
-    }
-
-    return this.uniqueSkinOptions(options);
-  }
-
-  chooseOwnedSkinForCustomSkin() {
-    return this.getOwnedSkinOptions()[0] || null;
-  }
-
-  getStoredCustomSkinLocalName() {
-    try {
-      const existing = this.storage?.getItem?.(CUSTOM_SKIN_LOCAL_NAME_KEY) || '';
-      return /^BlobioCustomSkin_[a-z0-9]{8,}$/i.test(existing) ? existing : '';
-    } catch {
-      return '';
-    }
-  }
-
-  getCustomSkinLocalName() {
-    try {
-      const existing = this.storage?.getItem?.(CUSTOM_SKIN_LOCAL_NAME_KEY) || '';
-      if (/^BlobioCustomSkin_[a-z0-9]{8,}$/i.test(existing)) {
-        return existing;
-      }
-
-      const random = Math.random().toString(36).slice(2, 10);
-      const localName = `${CUSTOM_SKIN_NAME}_${random || Date.now().toString(36)}`;
-      this.storage?.setItem?.(CUSTOM_SKIN_LOCAL_NAME_KEY, localName);
-      return localName;
-    } catch (error) {
-      this.logger.warn('[Blobio] Could not create local Custom Skin name.', error);
-      return `${CUSTOM_SKIN_NAME}_localonly`;
-    }
-  }
-
-  syncCustomSkinRuntimeConfig() {
-    const host = this.document.defaultView?.location?.host || '';
-    if (host !== 'custom.client.blobgame.io') {
-      return;
-    }
-
-    try {
-      const baseSkin = this.getCustomSkinBaseConfig();
-      const localSkinName = this.getStoredCustomSkinLocalName();
-      const previous = this.getPreviousSkinConfig();
-      this.clearCustomSkinBaseConfig();
-      this.storage?.removeItem?.(CUSTOM_SKIN_PREVIOUS_KEY);
-
-      // Clean up state left by the previous replacement-based custom skin path.
-      const currentSkin = this.storage?.getItem?.('config-skin') || '';
-      const shouldRestore = (baseSkin?.name && currentSkin === baseSkin.name) || (localSkinName && currentSkin === localSkinName);
-      if (shouldRestore) {
-        if (previous?.name) {
-          this.storage?.setItem?.('config-skin', previous.name);
-          this.storage?.setItem?.('config-skin-type', previous.type || CUSTOM_SKIN_TYPE);
-        } else {
-          this.storage?.removeItem?.('config-skin');
-          this.storage?.removeItem?.('config-skin-type');
-        }
-      }
-    } catch (error) {
-      this.logger.warn('[Blobio] Could not sync Custom Skin for the game client.', error);
-    }
-  }
-
   useCustomSkinUrl(url) {
     if (!this.isValidImgurSkinUrl(url)) {
       return { ok: false, reason: 'invalid-url' };
@@ -1482,8 +1316,6 @@ export class MenuFeature {
 
     try {
       this.publishCustomSkinRuntimeState(url, true);
-      this.clearCustomSkinBaseConfig();
-      this.storage?.removeItem?.(CUSTOM_SKIN_PREVIOUS_KEY);
       this.updateChooseSkinPreview(url);
       return { ok: true };
     } catch (error) {
@@ -1496,31 +1328,8 @@ export class MenuFeature {
     try {
       const selected = this.customSkinSelectedUrl || this.getActiveCustomSkinUrl();
       this.publishCustomSkinRuntimeState(selected, false);
-      this.clearCustomSkinBaseConfig();
-      this.storage?.removeItem?.(CUSTOM_SKIN_PREVIOUS_KEY);
     } catch (error) {
       this.logger.warn('[Blobio] Could not clear Custom Skin.', error);
-    }
-  }
-
-  getPreviousSkinConfig() {
-    try {
-      const raw = this.storage?.getItem?.(CUSTOM_SKIN_PREVIOUS_KEY);
-      if (!raw) {
-        return null;
-      }
-
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed.name !== 'string') {
-        return null;
-      }
-
-      return {
-        name: parsed.name,
-        type: typeof parsed.type === 'string' && parsed.type ? parsed.type : CUSTOM_SKIN_TYPE,
-      };
-    } catch {
-      return null;
     }
   }
 
@@ -1951,7 +1760,7 @@ export class MenuFeature {
         window.__blobioCustomSkinLaunchUrl = typeof url === 'string' ? url : '';
 
         function isValidSkinUrl(value) {
-          return /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i.test(String(value || '').trim());
+          return /^https:\/\/i\.imgur\.com\/[a-z0-9]+\.(?:png|jpe?g|webp)(?:\?.*)?$/i.test(String(value || '').trim());
         }
 
         function readCookie(name) {
@@ -2228,385 +2037,6 @@ export class MenuFeature {
 
     for (const host of this.document.querySelectorAll?.('.blobio-custom-skin-notice-host') || []) {
       host.classList?.remove('blobio-custom-skin-notice-host');
-    }
-  }
-
-  installCustomSkinRuntimeHook() {
-    const win = this.document.defaultView || globalThis;
-    const storage = this.storage;
-    const logger = this.logger;
-    const debugEvents = win.__blobioCustomSkinDebugEvents || [];
-    win.__blobioCustomSkinDebugEvents = debugEvents;
-
-    const redact = (value) => String(value || '')
-      .replace(/([?&]token=)[^&]+/gi, '$1<redacted>')
-      .replace(/"token"\s*:\s*"[^"]+"/gi, '"token":"<redacted>"')
-      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '<redacted-jwt>');
-
-    const sanitize = (value, depth = 0) => {
-      if (value === null || value === undefined) {
-        return value;
-      }
-
-      if (typeof value === 'string' || value instanceof String) {
-        return redact(value);
-      }
-
-      if (typeof value === 'number' || typeof value === 'boolean') {
-        return value;
-      }
-
-      if (depth >= 2) {
-        return '[truncated]';
-      }
-
-      if (Array.isArray(value)) {
-        return value.slice(0, 12).map((item) => sanitize(item, depth + 1));
-      }
-
-      if (typeof value === 'object') {
-        const result = {};
-        for (const key of Object.keys(value).slice(0, 24)) {
-          result[key] = /token|authorization|cookie/i.test(key)
-            ? '<redacted>'
-            : sanitize(value[key], depth + 1);
-        }
-        return result;
-      }
-
-      return redact(value);
-    };
-
-    win.__blobioCustomSkinDebugDump = () => [...win.__blobioCustomSkinDebugEvents];
-
-    win.__blobioCustomSkinDebugLog = (message, detail, stage = 'debug') => {
-      try {
-        const event = {
-          time: new Date().toISOString(),
-          stage,
-          message,
-          detail: sanitize(detail),
-        };
-        win.__blobioCustomSkinDebugEvents.push(event);
-        while (win.__blobioCustomSkinDebugEvents.length > 250) {
-          win.__blobioCustomSkinDebugEvents.shift();
-        }
-
-        if (storage?.getItem?.('blobio.customSkin.debug') !== '1') {
-          return;
-        }
-
-        const log = win.console?.debug || logger?.debug || logger?.log;
-        log?.call(win.console || logger, '[Blobio]', message, event.detail || '');
-      } catch {
-        // Debug logging must never break the injected game client.
-      }
-    };
-
-    win.__blobioCustomSkinDebugLog('Bundle custom skin runtime installed.', {
-      activeUrl: this.getActiveCustomSkinUrl(),
-      enabled: this.isCustomSkinEnabled(),
-    }, 'bootstrap');
-
-    win.__blobioCustomSkinRuntimeState = () => {
-      const activeUrl = this.getActiveCustomSkinUrl();
-      if (!this.isCustomSkinEnabled() || !activeUrl) {
-        return null;
-      }
-
-      return {
-        activeUrl,
-        userId: this.getAccessTokenUserId(),
-        playerName: storage?.getItem?.('config-username') || '',
-      };
-    };
-
-    if (!win.__blobioCustomSkinCells) {
-      win.__blobioCustomSkinCells = new Set();
-    }
-
-    win.__blobioCustomSkinIsLocalCell = (cell) => {
-      const state = win.__blobioCustomSkinRuntimeState?.();
-      if (!state || !cell) {
-        return false;
-      }
-
-      if (state.userId) {
-        const ids = [cell.J, cell.pID, cell.userId, cell.uid, cell.u].filter((value) => value !== undefined && value !== null);
-        return ids.some((value) => String(value) === state.userId);
-      }
-
-      const playerName = String(state.playerName || '').trim().toLowerCase();
-      const cellName = String(cell.B || cell.name || '').trim().toLowerCase();
-      return Boolean(playerName && cellName && playerName === cellName);
-    };
-
-    win.__blobioCustomSkinRegisterCell = (cell) => {
-      if (!win.__blobioCustomSkinIsLocalCell?.(cell)) {
-        return false;
-      }
-
-      win.__blobioCustomSkinCells.add(cell);
-      win.__blobioCustomSkinDebugLog?.('Registered local custom skin cell.', win.__blobioCustomSkinCells.size);
-      return true;
-    };
-
-    win.__blobioCustomSkinDrawOverlay = (cell) => win.__blobioCustomSkinRegisterCell?.(cell);
-
-    if (win.__blobioCustomSkinHookInstalled) {
-      return;
-    }
-
-    this.installCustomSkinNetworkDebugHooks(win);
-    this.installCustomSkinOverlayCanvas(win);
-    win.__blobioCustomSkinHookInstalled = true;
-  }
-
-  installCustomSkinNetworkDebugHooks(win) {
-    const redact = (value) => String(value || '')
-      .replace(/([?&]token=)[^&]+/gi, '$1<redacted>')
-      .replace(/"token"\s*:\s*"[^"]+"/gi, '"token":"<redacted>"')
-      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '<redacted-jwt>');
-
-    const xhrPrototype = win.XMLHttpRequest?.prototype;
-    if (xhrPrototype && !win.__blobioCustomSkinXhrHookInstalled) {
-      const originalOpen = xhrPrototype.open;
-      if (typeof originalOpen === 'function') {
-        xhrPrototype.open = function openCustomSkinDebugRequest(method, url, ...rest) {
-          win.__blobioCustomSkinDebugLog?.('XHR open', { method, url: redact(url) }, 'network');
-          return originalOpen.call(this, method, url, ...rest);
-        };
-        win.__blobioCustomSkinXhrHookInstalled = true;
-      }
-    }
-
-    if (typeof win.fetch === 'function' && !win.__blobioCustomSkinFetchHookInstalled) {
-      const originalFetch = win.fetch;
-      win.fetch = function fetchCustomSkinDebug(input, init) {
-        const url = typeof input === 'string' || input instanceof String ? String(input) : input?.url;
-        win.__blobioCustomSkinDebugLog?.('fetch', { url: redact(url || '') }, 'network');
-        return originalFetch.call(this, input, init);
-      };
-      win.__blobioCustomSkinFetchHookInstalled = true;
-    }
-
-    if (typeof win.WebSocket === 'function' && !win.__blobioCustomSkinWebSocketHookInstalled) {
-      const NativeWebSocket = win.WebSocket;
-      const WrappedWebSocket = function BlobioDebugWebSocket(url, protocols) {
-        win.__blobioCustomSkinDebugLog?.('WebSocket open', { url: redact(url), protocols }, 'network');
-        const socket = new NativeWebSocket(url, protocols);
-        const nativeSend = socket.send;
-
-        if (typeof nativeSend === 'function') {
-          socket.send = function sendBlobioDebugPacket(data) {
-            const length = typeof data === 'string' ? data.length : data?.byteLength ?? data?.size ?? 0;
-            win.__blobioCustomSkinDebugLog?.('WebSocket send', { length }, 'network');
-            return nativeSend.call(this, data);
-          };
-        }
-
-        socket.addEventListener?.('message', (event) => {
-          const data = event?.data;
-          const length = typeof data === 'string' ? data.length : data?.byteLength ?? data?.size ?? 0;
-          win.__blobioCustomSkinDebugLog?.('WebSocket message', { length }, 'network');
-        });
-
-        return socket;
-      };
-
-      WrappedWebSocket.prototype = NativeWebSocket.prototype;
-      win.WebSocket = WrappedWebSocket;
-      win.__blobioCustomSkinWebSocketHookInstalled = true;
-    }
-  }
-
-  installCustomSkinOverlayCanvas(win) {
-    if (win.__blobioCustomSkinOverlayInstalled || !win.document?.createElement || typeof win.Image !== 'function') {
-      return;
-    }
-
-    const overlay = win.document.createElement('canvas');
-    overlay.className = 'blobio-custom-skin-overlay-canvas';
-    overlay.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:2147481000';
-
-    const appendOverlay = () => {
-      try {
-        (win.document.body || win.document.documentElement)?.appendChild?.(overlay);
-      } catch {
-        // The overlay can wait for the next frame if body is not ready yet.
-      }
-    };
-
-    const image = new win.Image();
-    let loadedUrl = '';
-    let lastLog = 0;
-
-    const getNumber = (item, names) => {
-      for (const name of names) {
-        const value = Number(item?.[name]);
-        if (Number.isFinite(value)) {
-          return value;
-        }
-      }
-
-      return null;
-    };
-
-    const getCellRect = (cell, canvas) => {
-      const x = getNumber(cell, ['screenX', 'x', 'X', 'C', 'R', 'H']);
-      const y = getNumber(cell, ['screenY', 'y', 'Y', 'D', 'S', 'I']);
-      const size = getNumber(cell, ['screenSize', 'size', 'radius', 'r', 'w', 'M', 'F', 'A', 'O']);
-      if (x === null || y === null || size === null || size <= 0) {
-        return null;
-      }
-
-      const radius = size > 220 ? size / 2 : size;
-      if (x + radius < 0 || y + radius < 0 || x - radius > canvas.width || y - radius > canvas.height) {
-        return null;
-      }
-
-      return { x: x - radius, y: y - radius, size: radius * 2 };
-    };
-
-    const draw = () => {
-      const raf = win.requestAnimationFrame || ((callback) => win.setTimeout(callback, 16));
-      raf(draw);
-
-      const state = win.__blobioCustomSkinRuntimeState?.();
-      const ctx = overlay.getContext?.('2d');
-      if (!state || !ctx) {
-        return;
-      }
-
-      if (!overlay.parentNode) {
-        appendOverlay();
-      }
-
-      const width = win.innerWidth || win.document.documentElement?.clientWidth || 0;
-      const height = win.innerHeight || win.document.documentElement?.clientHeight || 0;
-      if (overlay.width !== width) {
-        overlay.width = width;
-      }
-      if (overlay.height !== height) {
-        overlay.height = height;
-      }
-
-      if (loadedUrl !== state.activeUrl) {
-        loadedUrl = state.activeUrl;
-        image.crossOrigin = 'anonymous';
-        win.__blobioCustomSkinDebugLog?.('Custom skin image load started.', { url: loadedUrl }, 'image');
-        image.onload = () => win.__blobioCustomSkinDebugLog?.('Custom skin image loaded.', { url: loadedUrl, width: image.naturalWidth, height: image.naturalHeight }, 'image');
-        image.onerror = () => win.__blobioCustomSkinDebugLog?.('Custom skin image failed to load.', { url: loadedUrl }, 'image');
-        image.src = loadedUrl;
-      }
-
-      ctx.clearRect(0, 0, overlay.width, overlay.height);
-      if (!image.complete || image.naturalWidth === 0) {
-        return;
-      }
-
-      let drawn = 0;
-      for (const cell of win.__blobioCustomSkinCells || []) {
-        if (!win.__blobioCustomSkinIsLocalCell?.(cell)) {
-          win.__blobioCustomSkinCells.delete(cell);
-          continue;
-        }
-
-        const rect = getCellRect(cell, overlay);
-        if (!rect) {
-          continue;
-        }
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(rect.x + rect.size / 2, rect.y + rect.size / 2, rect.size / 2, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(image, rect.x, rect.y, rect.size, rect.size);
-        ctx.restore();
-        drawn += 1;
-      }
-
-      const now = Date.now();
-      if (now - lastLog > 1000) {
-        lastLog = now;
-        win.__blobioCustomSkinDebugLog?.('Custom skin overlay frame.', {
-          cells: win.__blobioCustomSkinCells?.size || 0,
-          drawn,
-        }, 'overlay-frame');
-      }
-    };
-
-    appendOverlay();
-    draw();
-    win.__blobioCustomSkinOverlayInstalled = true;
-  }
-
-  installCustomSkinManifestResponsePatch(xhr) {
-    const textDescriptor = Object.getOwnPropertyDescriptor(xhr, 'responseText') || this.findPropertyDescriptor(Object.getPrototypeOf(xhr), 'responseText');
-    const responseDescriptor = Object.getOwnPropertyDescriptor(xhr, 'response') || this.findPropertyDescriptor(Object.getPrototypeOf(xhr), 'response');
-
-    if (textDescriptor) {
-      try {
-        Object.defineProperty(xhr, 'responseText', {
-          configurable: true,
-          get: () => {
-            const raw = typeof textDescriptor.get === 'function' ? textDescriptor.get.call(xhr) : textDescriptor.value;
-            return this.patchCustomSkinAssetManifest(raw);
-          },
-        });
-      } catch {
-        // Browser XHR implementations can reject per-instance response overrides.
-      }
-    }
-
-    if (responseDescriptor) {
-      try {
-        Object.defineProperty(xhr, 'response', {
-          configurable: true,
-          get: () => {
-            const raw = typeof responseDescriptor.get === 'function' ? responseDescriptor.get.call(xhr) : responseDescriptor.value;
-            return typeof raw === 'string' ? this.patchCustomSkinAssetManifest(raw) : raw;
-          },
-        });
-      } catch {
-        // Browser XHR implementations can reject per-instance response overrides.
-      }
-    }
-  }
-
-  findPropertyDescriptor(prototype, propertyName) {
-    let current = prototype;
-
-    while (current) {
-      const descriptor = Object.getOwnPropertyDescriptor(current, propertyName);
-      if (descriptor) {
-        return descriptor;
-      }
-
-      current = Object.getPrototypeOf(current);
-    }
-
-    return null;
-  }
-
-  resolveCustomSkinImageUrl(url) {
-    return String(url || '');
-  }
-
-  patchCustomSkinAssetManifest(text) {
-    return String(text || '');
-  }
-
-  isCustomSkinAssetManifestUrl(url) {
-    return /(?:^|\/)assets\/assets\.txt$/i.test(this.getUrlPath(url));
-  }
-
-  getUrlPath(url) {
-    try {
-      const baseUrl = this.document.defaultView?.location?.href || 'https://client.blobgame.io/';
-      return new URL(url, baseUrl).pathname;
-    } catch {
-      return String(url || '');
     }
   }
 

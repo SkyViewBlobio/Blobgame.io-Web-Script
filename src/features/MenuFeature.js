@@ -4,7 +4,7 @@ import { createBlobioStorage } from '../storage/BlobioStorage.js';
 const DEFAULT_CLASS_NAME = 'blobio-menu-enabled';
 const DEFAULT_STYLE_ID = 'blobio-menu-style';
 const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
-const DEFAULT_EXTENSION_VERSION = '0.1.42';
+const DEFAULT_EXTENSION_VERSION = '0.1.43';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -1459,6 +1459,7 @@ export class MenuFeature {
     }
 
     this.renderCustomSkinGallery(panel);
+    this.syncCustomSkinPanelHeight(skins, panel);
 
     if (tab.dataset.blobioCustomSkinListener !== 'true') {
       tab.dataset.blobioCustomSkinListener = 'true';
@@ -1751,9 +1752,36 @@ export class MenuFeature {
     return null;
   }
 
+  syncCustomSkinPanelHeight(skins, panel = skins?.querySelector?.('.blobio-custom-skin-panel')) {
+    if (!skins || !panel) {
+      return;
+    }
+
+    const nativeContainers = Array.from(skins.querySelectorAll?.('.skins-container') || [])
+      .filter((container) => container !== panel && !container.classList?.contains('blobio-custom-skin-panel'));
+    const heights = nativeContainers.map((container) => {
+      const rectHeight = Number(container.getBoundingClientRect?.().height) || 0;
+      return Math.max(rectHeight, Number(container.clientHeight) || 0, Number(container.offsetHeight) || 0);
+    });
+    const height = Math.max(0, ...heights);
+
+    if (height < 100) {
+      return;
+    }
+
+    const value = `${Math.ceil(height)}px`;
+    if (typeof skins.style?.setProperty === 'function') {
+      skins.style.setProperty('--blobio-custom-skin-panel-height', value);
+    } else if (skins.style) {
+      skins.style['--blobio-custom-skin-panel-height'] = value;
+    }
+  }
+
   activateCustomSkinPanel(skins) {
     const tabs = skins.querySelector?.('.left')?.querySelector?.('ul');
     const customTab = skins.querySelector?.('.blobio-custom-skin-tab');
+
+    this.syncCustomSkinPanelHeight(skins);
 
     for (const item of tabs?.children || []) {
       item.classList?.remove('active');

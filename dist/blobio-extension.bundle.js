@@ -290,7 +290,6 @@ html.${className} #ip-container {
 
 html.${className} app-settings,
 html.${className} app-skins,
-html.${className} app-profile,
 html.${className} app-shop,
 html.${className} .modal,
 html.${className} .popup,
@@ -312,6 +311,61 @@ html.${className} app-skins .custom-select-options,
 html.${className} app-profile .custom-select-options,
 html.${className} app-shop .custom-select-options {
   z-index: 901 !important;
+}
+
+html.${className} #profile-modal {
+  z-index: 900 !important;
+}
+
+html.${className} #profile-modal app-profile {
+  box-sizing: border-box !important;
+  min-width: min(700px, calc(100vw - 32px)) !important;
+}
+
+html.${className} #profile-modal .profile-records {
+  flex: 1 1 390px !important;
+  min-width: 390px !important;
+  box-sizing: border-box !important;
+}
+
+html.${className} #profile-modal .profile-records-title,
+html.${className} #profile-modal .profile-records-list,
+html.${className} #profile-modal .profile-records-list table {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+html.${className} #profile-modal .profile-records-title-userid,
+html.${className} #profile-modal .profile-records-title-text,
+html.${className} #profile-modal .profile-records-list th,
+html.${className} #profile-modal .profile-records-list td {
+  white-space: nowrap !important;
+}
+
+html.${className} #profile-modal .profile-records-list table {
+  table-layout: auto !important;
+  border-collapse: collapse !important;
+}
+
+html.${className} #profile-modal .profile-records-list th:first-child,
+html.${className} #profile-modal .profile-records-list td:first-child {
+  width: 48% !important;
+  text-align: left !important;
+}
+
+html.${className} #profile-modal .profile-records-list .rtd {
+  min-width: 92px !important;
+  text-align: right !important;
+}
+
+@media (max-width: 740px) {
+  html.${className} #profile-modal app-profile {
+    min-width: calc(100vw - 20px) !important;
+  }
+
+  html.${className} #profile-modal .profile-records {
+    min-width: 0 !important;
+  }
 }
 
 html.${className} #ip-container table {
@@ -834,11 +888,13 @@ html.${className} app-skins .blobio-custom-skin-tab.active {
 
 html.${className} app-skins .blobio-custom-skin-panel {
   display: none !important;
+  flex: 1 1 auto !important;
+  align-self: stretch !important;
   padding: 10px 12px 12px !important;
   margin-top: -10px !important;
-  min-height: 455px !important;
-  height: calc(100% + 72px) !important;
-  max-height: 560px !important;
+  min-height: var(--blobio-custom-skin-panel-height, 455px) !important;
+  height: 100% !important;
+  max-height: none !important;
   overflow-y: auto !important;
   box-sizing: border-box !important;
   border: 1px solid rgba(142, 255, 174, 0.42) !important;
@@ -877,14 +933,29 @@ html.${className} app-skins.blobio-custom-skin-active .skins-container:not(.blob
   display: none !important;
 }
 
+html.${className} app-skins.blobio-custom-skin-active .body {
+  align-items: stretch !important;
+}
+
+html.${className} app-skins.blobio-custom-skin-active .right {
+  display: flex !important;
+  flex-direction: column !important;
+  align-self: stretch !important;
+  min-height: 0 !important;
+}
+
 html.${className} app-skins.blobio-custom-skin-active .blobio-custom-skin-panel {
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 html.${className} app-skins.blobio-custom-skin-active .right > .inner-container,
 html.${className} app-skins.blobio-custom-skin-active .inner-container.zero-top-left-border {
-  min-height: 525px !important;
-  height: auto !important;
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  min-height: var(--blobio-custom-skin-panel-height, 525px) !important;
+  height: 100% !important;
   border: 1px solid rgba(142, 255, 174, 0.36) !important;
   border-radius: 10px !important;
   background: linear-gradient(145deg, rgba(3, 31, 19, 0.92), rgba(1, 10, 7, 0.92)) !important;
@@ -1302,7 +1373,7 @@ html.${className} .blobio-watermark-extension::after {
   var DEFAULT_CLASS_NAME2 = "blobio-menu-enabled";
   var DEFAULT_STYLE_ID2 = "blobio-menu-style";
   var DEFAULT_TOOLBAR_CLASS = "blobio-menu-toolbar";
-  var DEFAULT_EXTENSION_VERSION = "0.1.42";
+  var DEFAULT_EXTENSION_VERSION = "0.1.43";
   var HIDDEN_CLASS = "blobio-original-hidden";
   var PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
   var FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -2507,6 +2578,7 @@ html.${className} .blobio-watermark-extension::after {
         host.appendChild(panel);
       }
       this.renderCustomSkinGallery(panel);
+      this.syncCustomSkinPanelHeight(skins, panel);
       if (tab.dataset.blobioCustomSkinListener !== "true") {
         tab.dataset.blobioCustomSkinListener = "true";
         this.addCustomSkinListener(tab, "click", (event) => {
@@ -2738,9 +2810,30 @@ html.${className} .blobio-watermark-extension::after {
       }
       return null;
     }
+    syncCustomSkinPanelHeight(skins, panel = skins?.querySelector?.(".blobio-custom-skin-panel")) {
+      if (!skins || !panel) {
+        return;
+      }
+      const nativeContainers = Array.from(skins.querySelectorAll?.(".skins-container") || []).filter((container) => container !== panel && !container.classList?.contains("blobio-custom-skin-panel"));
+      const heights = nativeContainers.map((container) => {
+        const rectHeight = Number(container.getBoundingClientRect?.().height) || 0;
+        return Math.max(rectHeight, Number(container.clientHeight) || 0, Number(container.offsetHeight) || 0);
+      });
+      const height = Math.max(0, ...heights);
+      if (height < 100) {
+        return;
+      }
+      const value = `${Math.ceil(height)}px`;
+      if (typeof skins.style?.setProperty === "function") {
+        skins.style.setProperty("--blobio-custom-skin-panel-height", value);
+      } else if (skins.style) {
+        skins.style["--blobio-custom-skin-panel-height"] = value;
+      }
+    }
     activateCustomSkinPanel(skins) {
       const tabs = skins.querySelector?.(".left")?.querySelector?.("ul");
       const customTab = skins.querySelector?.(".blobio-custom-skin-tab");
+      this.syncCustomSkinPanelHeight(skins);
       for (const item of tabs?.children || []) {
         item.classList?.remove("active");
       }

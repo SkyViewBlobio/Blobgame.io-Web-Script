@@ -1,4 +1,7 @@
 import { normalizeUid } from '../roles/RoleRegistry.js';
+import { extractUidFromElement, findAngularUid } from '../roles/UidReader.js';
+
+export { extractUidFromElement } from '../roles/UidReader.js';
 
 const MENU_SELECTOR = [
   '#mouse-menu',
@@ -18,70 +21,7 @@ const MENU_SELECTOR = [
   '[data-player-menu]',
 ].join(',');
 
-const UID_ATTRIBUTES = [
-  'uid',
-  'data-uid',
-  'user-id',
-  'data-user-id',
-  'userid',
-  'data-userid',
-  'player-uid',
-  'data-player-uid',
-  'player-id',
-  'data-player-id',
-];
-
-const UID_KEYS = ['uid', 'userId', 'userID', 'user_id', 'playerUid', 'playerUID', 'playerId', 'playerID'];
 const CONTEXT_DELAYS = [0, 40, 140, 320];
-
-function uidFromAttributes(element) {
-  for (const attribute of UID_ATTRIBUTES) {
-    const uid = normalizeUid(element?.getAttribute?.(attribute));
-    if (uid) {
-      return uid;
-    }
-  }
-
-  for (const attribute of Array.from(element?.attributes || [])) {
-    if (!/(?:uid|user.*id|player.*id)/i.test(attribute?.name || '')) {
-      continue;
-    }
-
-    const uid = normalizeUid(attribute.value);
-    if (uid) {
-      return uid;
-    }
-  }
-
-  return '';
-}
-
-export function extractUidFromElement(element, includeDescendants = true) {
-  if (!element) {
-    return '';
-  }
-
-  const ownUid = uidFromAttributes(element);
-  if (ownUid) {
-    return ownUid;
-  }
-
-  if (!includeDescendants) {
-    return '';
-  }
-
-  const descendants = element.querySelectorAll?.('*') || [];
-  for (const node of descendants) {
-    const uid = uidFromAttributes(node);
-    if (uid) {
-      return uid;
-    }
-  }
-
-  const text = String(element.textContent || '');
-  const match = text.match(/(?:UID|User\s*ID|Player\s*ID)\s*[:#-]?\s*(\d{1,20})/i);
-  return normalizeUid(match?.[1]);
-}
 
 export function hasProtectedRoleText(element) {
   const text = String(element?.textContent || '');
@@ -388,7 +328,10 @@ export class PlayerMuteFeature {
       return;
     }
 
-    this.mutedPlayersStore?.add?.(uid);
+    const added = this.mutedPlayersStore?.add?.(uid);
+    if (added) {
+      this.notifications?.showMutedPlayerNotification?.(uid);
+    }
   }
 
   readTargetFromMenu(menu) {
@@ -401,66 +344,11 @@ export class PlayerMuteFeature {
   }
 
   readAngularTarget(menu) {
-    const seeds = [];
-    const nodes = [menu, ...Array.from(menu?.querySelectorAll?.('*') || []).slice(0, 80)];
-    for (const node of nodes) {
-      for (const key of Object.getOwnPropertyNames(node || {})) {
-        if (/^__ng|player|target|selected/i.test(key)) {
-          try {
-            seeds.push(node[key]);
-          } catch {}
-        }
-      }
-    }
-
-    const queue = seeds.map((value) => ({ value, depth: 0 }));
-    const seen = new Set();
-    let inspected = 0;
-
-    while (queue.length > 0 && inspected < 300) {
-      const { value, depth } = queue.shift();
-      if (!value || (typeof value !== 'object' && !Array.isArray(value)) || seen.has(value)) {
-        continue;
-      }
-      seen.add(value);
-      inspected += 1;
-
-      let uid = '';
-      for (const key of UID_KEYS) {
-        try {
-          uid = normalizeUid(value[key]);
-        } catch {}
-        if (uid) {
-          break;
-        }
-      }
-
-      if (uid) {
-        return { uid, protected: this.objectHasProtectedRole(value) };
-      }
-
-      if (depth >= 4) {
-        continue;
-      }
-
-      let entries;
-      try {
-        entries = Array.isArray(value) ? value.entries() : Object.entries(value);
-      } catch {
-        continue;
-      }
-
-      for (const [key, child] of entries) {
-        if (!child || typeof child !== 'object' || child.nodeType || child === this.document.defaultView) {
-          continue;
-        }
-        if (Array.isArray(value) || /player|user|target|selected|data|context|component|menu/i.test(String(key))) {
-          queue.push({ value: child, depth: depth + 1 });
-        }
-      }
-    }
-
-    return { uid: '', protected: false };
+    const target = findAngularUid(menu);
+    return {
+      uid: target.uid,
+      protected: target.value ? this.objectHasProtectedRole(target.value) : false,
+    };
   }
 
   objectHasProtectedRole(value) {

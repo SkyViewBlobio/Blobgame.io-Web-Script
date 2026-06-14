@@ -6,7 +6,7 @@ import { isFpsUncapEnabled, setFpsUncapEnabled } from '../settings/RuntimeSettin
 const DEFAULT_CLASS_NAME = 'blobio-menu-enabled';
 const DEFAULT_STYLE_ID = 'blobio-menu-style';
 const DEFAULT_TOOLBAR_CLASS = 'blobio-menu-toolbar';
-const DEFAULT_EXTENSION_VERSION = '0.1.60';
+const DEFAULT_EXTENSION_VERSION = '0.1.62';
 const HIDDEN_CLASS = 'blobio-original-hidden';
 const PARTNER_LINK_MATCH = /iogames\.space|iogames\.live|io-games\.zone|silvergames\.com|crazygames\.com/i;
 const FAILED_VIRAL_FRAME_MATCH = /viral\.iogames\.space/i;
@@ -33,6 +33,7 @@ const EXTENSION_OPTION_TOOLTIPS = {
   watermark: 'This option will display the Extension name text, alongside its current version.',
   customSkin: 'Replace one of your owned skin assets locally with a saved direct i.imgur.com image. Only you see the custom image.',
   hideAdminMd: 'Hide the built-in [MD] tag from extension ADMIN users in chat. This is enabled by default.',
+  friendHighlight: 'Color accepted friends in chat green by matching their Blobgame UID. Friend requests and declined users are ignored.',
   fpsUncap: 'Uncap the in-game render loop after a safe startup delay, periodically yield to native frames, keep the game active when unfocused, and smooth camera zoom using the real frame delta. Off by default and applies immediately.',
 };
 
@@ -117,6 +118,7 @@ export class MenuFeature {
     storage = createBlobioStorage(document),
     roleRegistry = null,
     uidDetector = null,
+    friendHighlightStore = null,
     version = DEFAULT_EXTENSION_VERSION,
     frontPageUi = true,
   } = {}) {
@@ -128,6 +130,7 @@ export class MenuFeature {
     this.storage = storage;
     this.roleRegistry = roleRegistry;
     this.uidDetector = uidDetector;
+    this.friendHighlightStore = friendHighlightStore;
     this.version = version;
     this.frontPageUi = frontPageUi;
     this.started = false;
@@ -150,6 +153,7 @@ export class MenuFeature {
     this.keydownHandler = null;
     this.unsubscribeAdminRoles = null;
     this.unsubscribeAdminUid = null;
+    this.unsubscribeFriendHighlight = null;
   }
 
   start() {
@@ -176,6 +180,7 @@ export class MenuFeature {
     this.syncCustomSkinAvailability();
     this.installExtensionSettings();
     this.installAdminSettingTracking();
+    this.installFriendHighlightTracking();
     this.installCustomSkinUi();
     this.syncWatermark();
     this.syncUsernameAnimation();
@@ -227,8 +232,10 @@ export class MenuFeature {
     this.clearCustomSkinNoticeTimer();
     this.unsubscribeAdminRoles?.();
     this.unsubscribeAdminUid?.();
+    this.unsubscribeFriendHighlight?.();
     this.unsubscribeAdminRoles = null;
     this.unsubscribeAdminUid = null;
+    this.unsubscribeFriendHighlight = null;
     this.cleanupExtensionSettings();
     this.cleanupCustomSkinUi();
 
@@ -907,6 +914,15 @@ export class MenuFeature {
         },
       }),
       this.createExtensionSwitchRow({
+        id: 'config-switch-friend-highlight',
+        label: 'Friends-highlight',
+        description: EXTENSION_OPTION_TOOLTIPS.friendHighlight,
+        checked: Boolean(this.friendHighlightStore?.isEnabled?.()),
+        onChange: (enabled, checkbox) => {
+          checkbox.checked = this.friendHighlightStore?.setEnabled?.(enabled) ?? false;
+        },
+      }),
+      this.createExtensionSwitchRow({
         id: 'config-switch-hide-admin-md',
         label: 'Hide MD badge',
         description: EXTENSION_OPTION_TOOLTIPS.hideAdminMd,
@@ -1043,12 +1059,30 @@ export class MenuFeature {
       fpsUncap.checked = isFpsUncapEnabled(this.storage);
     }
 
+    const friendHighlight = panel.querySelector?.('#config-switch-friend-highlight');
+    if (friendHighlight) {
+      friendHighlight.checked = Boolean(this.friendHighlightStore?.isEnabled?.());
+    }
+
     const hideAdminMd = panel.querySelector?.('#config-switch-hide-admin-md');
     if (hideAdminMd) {
       hideAdminMd.checked = isHideAdminMdEnabled(this.storage);
     }
 
     this.syncAdminSettingVisibility(panel);
+  }
+
+  installFriendHighlightTracking() {
+    if (!this.unsubscribeFriendHighlight) {
+      this.unsubscribeFriendHighlight = this.friendHighlightStore?.subscribe?.(() => {
+        for (const panel of this.document.querySelectorAll?.('.blobio-extension-settings-panel') || []) {
+          const checkbox = panel.querySelector?.('#config-switch-friend-highlight');
+          if (checkbox) {
+            checkbox.checked = Boolean(this.friendHighlightStore?.isEnabled?.());
+          }
+        }
+      }) || null;
+    }
   }
 
   installAdminSettingTracking() {

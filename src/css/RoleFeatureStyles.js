@@ -97,6 +97,11 @@ export const VIP_BADGE_CSS = `
 `;
 
 export const CHAT_ROLE_CSS = `
+
+#chat li.blobio-chat-muted-message {
+  display: none !important;
+}
+
 #chat .blobio-extension-chat-tag {
   font-weight: 800 !important;
 }
@@ -118,6 +123,11 @@ export const CHAT_ROLE_CSS = `
   font-style: italic !important;
   text-decoration: none !important;
   text-shadow: 0 0 7px rgba(0, 255, 0, 0.72);
+}
+
+#chat .blobio-chat-friend-username:not(.blobio-chat-admin-username) {
+  color: rgb(0, 255, 0) !important;
+  text-shadow: -1px 0 1px rgba(0, 0, 0, 0.88), 1px 0 1px rgba(0, 0, 0, 0.88), 0 1px 2px rgba(0, 0, 0, 0.94) !important;
 }
 
 #chat .blobio-chat-admin-username {

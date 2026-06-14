@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Blobio Web Script Loader
 // @namespace    https://github.com/SkyViewBlobio/Blobgame.io-Extension
-// @version      0.1.60
+// @version      0.1.62
 // @description  Loads the Blobio modular extension bundle from GitHub.
 // @match        *://blobgame.io/*
 // @match        *://custom.client.blobgame.io/*
@@ -13,6 +13,7 @@
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
 // @connect      cdn.jsdelivr.net
 // @connect      raw.githubusercontent.com
 // @downloadURL  https://raw.githubusercontent.com/SkyViewBlobio/Blobgame.io-Extension/main/loader/blobio-loader.user.js
@@ -23,7 +24,7 @@
   'use strict';
 
   const LOG_PREFIX = '[Blobio]';
-  const VERSION = '0.1.60';
+  const VERSION = '0.1.62';
   const CUSTOM_CLIENT_HOST = 'custom.client.blobgame.io';
   const STORAGE_BRIDGE_SOURCE = 'BlobioExtensionStorageBridge';
   const CUSTOM_SKIN_ENABLED_KEY = 'blobio.customSkin.enabled';

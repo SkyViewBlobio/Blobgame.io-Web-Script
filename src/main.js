@@ -10,7 +10,9 @@ import { MutedPlayersStore } from './chat/MutedPlayersStore.js';
 import { BackgroundFeature } from './features/BackgroundFeature.js';
 import { ChatRoleFeature } from './features/ChatRoleFeature.js';
 import { ChatSettingsFeature } from './features/ChatSettingsFeature.js';
+import { FriendListFeature } from './features/FriendListFeature.js';
 import { MenuFeature } from './features/MenuFeature.js';
+import { FriendHighlightStore } from './friends/FriendHighlightStore.js';
 import { PlayerMuteFeature } from './features/PlayerMuteFeature.js';
 import { VipBadgeFeature } from './features/VipBadgeFeature.js';
 import { getBlobioHostMode } from './hostRules.js';
@@ -26,6 +28,7 @@ class BlobioExtension {
     this.features = [];
     this.roleRegistry = null;
     this.mutedPlayersStore = null;
+    this.friendHighlightStore = null;
     this.started = false;
   }
 
@@ -53,6 +56,8 @@ class BlobioExtension {
     const logger = this.window.console || console;
     this.roleRegistry = new RoleRegistry({ document, logger });
     this.roleRegistry.start();
+    this.friendHighlightStore = new FriendHighlightStore({ document, logger });
+    this.friendHighlightStore.start();
 
     const menuAssets = {
       recommendedButton: recommendedButtonUrl,
@@ -63,6 +68,12 @@ class BlobioExtension {
       facebookIcon: facebookIconUrl,
       instagramIcon: instagramIconUrl,
     };
+
+    this.features.push(new FriendListFeature({
+      document,
+      logger,
+      friendHighlightStore: this.friendHighlightStore,
+    }));
 
     if (hostMode === 'frontpage') {
       const uidDetector = new ProfileUidDetector({ document, logger });
@@ -77,6 +88,7 @@ class BlobioExtension {
           frontPageUi: true,
           roleRegistry: this.roleRegistry,
           uidDetector,
+          friendHighlightStore: this.friendHighlightStore,
         }),
         new VipBadgeFeature({
           document,
@@ -100,6 +112,7 @@ class BlobioExtension {
           logger,
           roleRegistry: this.roleRegistry,
           mutedPlayersStore: this.mutedPlayersStore,
+          friendHighlightStore: this.friendHighlightStore,
         }),
         chatSettings,
         new PlayerMuteFeature({
@@ -130,6 +143,8 @@ class BlobioExtension {
     this.roleRegistry = null;
     this.mutedPlayersStore?.destroy();
     this.mutedPlayersStore = null;
+    this.friendHighlightStore?.destroy();
+    this.friendHighlightStore = null;
     this.started = false;
   }
 }
